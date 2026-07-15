@@ -1,0 +1,11 @@
+# Python / FastAPI backend
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.env
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+.DS_Store

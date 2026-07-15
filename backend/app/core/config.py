@@ -1,0 +1,67 @@
+"""
+Application settings.
+
+Centralizes ALL configuration in one typed object so the rest of the code never
+reads os.environ directly. Values are loaded (in priority order) from real
+environment variables, then a local `.env` file, then the defaults below.
+
+Powered by pydantic-settings, so every value is validated and type-cast on
+startup — a bad config fails fast and loudly instead of at request time.
+"""
+
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    # --- App metadata (surfaced in Swagger / OpenAPI docs) ---
+    APP_NAME: str = "KnightForge Sahayak API"
+    APP_DESCRIPTION: str = "AI Paperwork Copilot — backend API"
+    APP_VERSION: str = "0.1.0"
+
+    # --- Runtime ---
+    # ENVIRONMENT drives environment-specific behavior (e.g. docs visibility).
+    ENVIRONMENT: str = "development"
+    # DEBUG toggles verbose logging and auto-reload-friendly behavior.
+    DEBUG: bool = True
+    # LOG_LEVEL is any standard logging level name: DEBUG/INFO/WARNING/ERROR.
+    LOG_LEVEL: str = "INFO"
+
+    # --- Server ---
+    HOST: str = "0.0.0.0"
+    PORT: int = 8000
+
+    # --- CORS ---
+    # Comma-separated list of origins allowed to call this API from a browser.
+    # Kept permissive for local dev; tighten for production.
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+
+    # Load a local `.env` file if present. `extra="ignore"` means placeholder
+    # keys reserved for later phases (OpenAI, OCR, etc.) won't crash startup.
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Split the CORS_ORIGINS string into a clean list for the middleware."""
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+
+
+@lru_cache
+def get_settings() -> Settings:
+    """
+    Return a cached singleton Settings instance.
+
+    @lru_cache ensures the `.env` file is parsed exactly once per process and the
+    same object is reused everywhere it's imported.
+    """
+    return Settings()
+
+
+# Convenience singleton for simple imports: `from app.core.config import settings`.
+settings = get_settings()
