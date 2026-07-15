@@ -1,0 +1,16 @@
+{
+  "name": "Rahul Sharma",
+  "father_name": "Mahesh Sharma",
+  "dob": "15-08-1999",
+  "gender": "Male",
+  "pan": "ABCDE1234F",
+  "aadhaar": "123456789012",
+  "mobile": "9876543210",
+  "email": "rahul.sharma@gmail.com",
+  "occupation": "Software Engineer",
+  "annual_income": "1200000",
+  "address": "Flat 302, Pune, Maharashtra",
+  "city": "Pune",
+  "state": "Maharashtra",
+  "pincode": "411001"
+}
