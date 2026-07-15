@@ -1,12 +1,14 @@
-# KnightForge Sahayak — Backend dependencies (Phase 1 foundation only)
+# KnightForge Sahayak — Backend dependencies (Phases 1–6)
 # Python 3.12
 #
-# Intentionally minimal. NO OCR, NO OpenAI, NO PDF libraries yet — those arrive
-# in later phases. Versions are pinned with compatible-release (~=) so patch
-# updates are allowed but majors are not.
+# Intentionally minimal. NO OCR, NO PDF libraries yet — those arrive in later
+# phases. Versions are pinned with compatible-release (~=) so patch updates are
+# allowed but majors are not.
 
 fastapi~=0.115.0          # web framework + automatic Swagger/OpenAPI docs
 uvicorn[standard]~=0.32.0 # ASGI server (runs `uvicorn app.main:app --reload`)
 pydantic~=2.9.0           # data validation / response models
 pydantic-settings~=2.6.0  # typed settings loaded from env + .env file
 python-dotenv~=1.0.0      # .env file support
+openai>=1.55.0,<3         # Phase 5 — AI conversation layer (JSON-mode chat)
+python-multipart~=0.0.17  # Phase 6 — multipart/form-data parsing for UploadFile

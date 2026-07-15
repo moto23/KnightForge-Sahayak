@@ -83,3 +83,26 @@ class InterviewStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"       # all required fields valid
     ABANDONED = "abandoned"
+
+
+class Language(str, Enum):
+    """
+    Languages the AI conversation layer can speak (Phase 5).
+
+    The language ONLY changes how replies are phrased — field ids, stored
+    answers, and validation stay language-independent machine values.
+    """
+
+    ENGLISH = "english"
+    HINGLISH = "hinglish"    # Hindi in Roman script, mixed naturally with English
+    HINDI = "hindi"          # simple Hindi, Devanagari script
+
+
+class DocumentCategory(str, Enum):
+    """
+    Broad category of an uploaded document (Phase 6) — decides which storage
+    subdirectory a file lands in and how later phases (OCR) will treat it.
+    """
+
+    PDF = "pdf"        # stored under uploads/pdf/
+    IMAGE = "image"    # stored under uploads/images/
