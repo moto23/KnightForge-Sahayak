@@ -37,6 +37,22 @@ class Settings(BaseSettings):
     # Kept permissive for local dev; tighten for production.
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
 
+    # --- OpenAI (Phase 5 — AI Conversation Engine) ---
+    # Empty key = AI disabled; every conversation endpoint then serves the
+    # deterministic fallback responses instead of failing.
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    # Per-request timeout: a hung OpenAI call must never hang the interview.
+    OPENAI_TIMEOUT_SECONDS: float = 20.0
+
+    # --- Uploads (Phase 6 — Document Upload Pipeline) ---
+    # Root directory for stored uploads, relative to the backend working
+    # directory (subfolders pdf/ and images/ are created beneath it).
+    UPLOAD_DIR: str = "uploads"
+    # Hard cap on a single uploaded file. Enforced while streaming, so an
+    # oversized body is rejected without ever being fully read into memory.
+    MAX_UPLOAD_SIZE_MB: int = 10
+
     # Load a local `.env` file if present. `extra="ignore"` means placeholder
     # keys reserved for later phases (OpenAI, OCR, etc.) won't crash startup.
     model_config = SettingsConfigDict(
