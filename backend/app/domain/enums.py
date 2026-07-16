@@ -106,3 +106,44 @@ class DocumentCategory(str, Enum):
 
     PDF = "pdf"        # stored under uploads/pdf/
     IMAGE = "image"    # stored under uploads/images/
+
+
+class DocumentQuality(str, Enum):
+    """
+    Estimated scan/photo quality of an uploaded document (Phase 7).
+
+    Drives user-facing warnings ("your scan looks blurry") and lets the
+    pipeline handle poor scans and blank pages gracefully instead of failing.
+    """
+
+    GOOD = "good"      # digital PDF or sharp, high-resolution scan
+    FAIR = "fair"      # readable but OCR accuracy may drop
+    POOR = "poor"      # low resolution / low contrast — expect OCR mistakes
+    BLANK = "blank"    # page appears to contain (almost) nothing
+
+
+class ExtractionSource(str, Enum):
+    """
+    Where an extracted field's text originally came from (Phase 7).
+
+    A digital PDF's embedded text layer is exact (no OCR noise), while OCR of
+    a scanned image is probabilistic — the ConfidenceEngine weighs the two very
+    differently.
+    """
+
+    PDF_TEXT_LAYER = "pdf_text_layer"   # exact text embedded in the PDF
+    OCR = "ocr"                         # recognized from pixels by the OCR engine
+
+
+class ExtractionMethod(str, Enum):
+    """
+    HOW the ExtractionEngine matched a value to a KYC field (Phase 7).
+
+    Reported per field for transparency and used by the ConfidenceEngine:
+    an unambiguous format pattern (e.g. a PAN) is stronger evidence than a
+    label match, which is stronger than spotting a bare option word.
+    """
+
+    LABEL = "label_match"       # "PAN : ABCDE1234F" — value found after the field's label
+    PATTERN = "pattern_match"   # value matched an unambiguous format (PAN, Aadhaar, email…)
+    OPTION = "option_match"     # a schema option word found on the field's labelled line

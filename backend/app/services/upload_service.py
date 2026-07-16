@@ -164,6 +164,19 @@ class UploadService:
             raise DocumentNotFoundError(document_id)
         return document
 
+    def read_content(self, document: UploadedDocument) -> bytes:
+        """
+        Return a stored document's raw bytes (Phase 7 pipeline input).
+
+        Callers pass the metadata record (from get_document) so this stays a
+        dumb delegation to the FileStorage port. A metadata record whose file
+        has vanished from disk surfaces as the typed 404.
+        """
+        try:
+            return self._storage.read(document.category, document.stored_filename)
+        except FileNotFoundError as exc:
+            raise DocumentNotFoundError(document.document_id) from exc
+
     def list_documents(self) -> tuple[UploadedDocument, ...]:
         """Return metadata for every stored document, newest first."""
         return self._repository.list_all()

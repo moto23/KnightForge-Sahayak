@@ -12,13 +12,14 @@ import logging
 
 from fastapi import APIRouter, Depends, File, UploadFile
 
-from app.core.dependencies import get_upload_service
+from app.core.dependencies import get_document_understanding_service, get_upload_service
 from app.schemas.upload import (
     DeleteUploadResponse,
     DocumentMetadataResponse,
     ListUploadsResponse,
     UploadResponse,
 )
+from app.services.document_understanding_service import DocumentUnderstandingService
 from app.services.upload_service import UploadService
 
 logger = logging.getLogger(__name__)
@@ -96,7 +97,11 @@ async def get_document(
 async def delete_document(
     document_id: str,
     uploads: UploadService = Depends(get_upload_service),
+    understanding: DocumentUnderstandingService = Depends(
+        get_document_understanding_service
+    ),
 ) -> DeleteUploadResponse:
-    """Delete one uploaded document (bytes + metadata)."""
+    """Delete one uploaded document (bytes + metadata + cached OCR results)."""
     uploads.delete_document(document_id)
+    understanding.forget(document_id)  # drop any cached Phase 7 pipeline result
     return DeleteUploadResponse(document_id=document_id, deleted=True)

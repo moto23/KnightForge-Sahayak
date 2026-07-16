@@ -13,6 +13,8 @@ here.
 """
 
 from app.core.config import settings
+from app.infrastructure.ocr.pymupdf_inspector import PyMuPdfInspector
+from app.infrastructure.ocr.tesseract_ocr_provider import TesseractOCRProvider
 from app.infrastructure.repositories.in_memory_conversation_repository import (
     InMemoryConversationRepository,
 )
@@ -22,15 +24,23 @@ from app.infrastructure.repositories.in_memory_document_repository import (
 from app.infrastructure.repositories.in_memory_session_repository import (
     InMemorySessionRepository,
 )
+from app.infrastructure.repositories.in_memory_understanding_repository import (
+    InMemoryDocumentUnderstandingRepository,
+)
 from app.infrastructure.storage.local_storage_adapter import LocalStorageAdapter
 from app.services.ai_service import AIService
 from app.services.conversation_service import ConversationService
+from app.services.document_analysis_service import DocumentAnalysisService
+from app.services.document_understanding_service import DocumentUnderstandingService
+from app.services.extraction_engine import extraction_engine
 from app.services.form_service import FormService, form_service
 from app.services.form_validation_service import (
     FormValidationService,
     form_validation_service,
 )
 from app.services.interview_service import InterviewService
+from app.services.ocr_service import OCRService
+from app.services.session_prefill_service import SessionPrefillService
 from app.services.session_service import SessionService
 from app.services.upload_service import UploadService
 
@@ -53,6 +63,24 @@ conversation_service = ConversationService(
 # Phase 6: swap LocalStorageAdapter for an S3 adapter here — one line — and the
 # whole upload pipeline moves to the cloud untouched.
 upload_service = UploadService(repository=_document_repository, storage=_file_storage)
+
+# --------------------------------------------------------------------------- #
+# Phase 7 — Intelligent Document Understanding Pipeline.
+# The ONLY place Tesseract (and PyMuPDF/Pillow) are bound to their ports:
+# swap TesseractOCRProvider for a cloud OCR adapter here and nothing else
+# in the codebase changes.
+# --------------------------------------------------------------------------- #
+_ocr_provider = TesseractOCRProvider()
+_document_inspector = PyMuPdfInspector()
+_understanding_repository = InMemoryDocumentUnderstandingRepository()
+document_understanding_service = DocumentUnderstandingService(
+    uploads=upload_service,
+    analysis=DocumentAnalysisService(inspector=_document_inspector),
+    ocr=OCRService(provider=_ocr_provider, inspector=_document_inspector),
+    extraction=extraction_engine,
+    prefill=SessionPrefillService(sessions=session_service),
+    repository=_understanding_repository,
+)
 
 
 def get_form_service() -> FormService:
@@ -83,3 +111,8 @@ def get_conversation_service() -> ConversationService:
 def get_upload_service() -> UploadService:
     """Provide the shared UploadService (document upload pipeline)."""
     return upload_service
+
+
+def get_document_understanding_service() -> DocumentUnderstandingService:
+    """Provide the shared DocumentUnderstandingService (OCR + extraction pipeline)."""
+    return document_understanding_service

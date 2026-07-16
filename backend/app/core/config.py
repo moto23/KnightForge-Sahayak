@@ -53,6 +53,24 @@ class Settings(BaseSettings):
     # oversized body is rejected without ever being fully read into memory.
     MAX_UPLOAD_SIZE_MB: int = 10
 
+    # --- Document Understanding (Phase 7 — OCR & Extraction Pipeline) ---
+    # Full path to the tesseract executable. Empty = auto-detect (PATH, then
+    # the standard Windows install locations). Never imported outside the
+    # TesseractOCRProvider adapter.
+    TESSERACT_CMD: str = ""
+    # Language(s) Tesseract should recognize ("eng", "eng+hin", ...).
+    OCR_LANGUAGES: str = "eng"
+    # DPI used when rasterizing scanned-PDF pages for OCR. 300 is the sweet
+    # spot for Tesseract accuracy vs. speed.
+    OCR_RENDER_DPI: int = 300
+    # A PDF page counts as having a usable embedded text layer only if it
+    # yields at least this many characters (guards against near-empty layers).
+    PDF_TEXT_LAYER_MIN_CHARS: int = 50
+    # Minimum confidence (0.0-1.0) an extracted field needs before the
+    # SessionPrefillService will auto-fill it into an interview session.
+    # Uncertain fields stay unanswered so the interview asks about them.
+    PREFILL_CONFIDENCE_THRESHOLD: float = 0.75
+
     # Load a local `.env` file if present. `extra="ignore"` means placeholder
     # keys reserved for later phases (OpenAI, OCR, etc.) won't crash startup.
     model_config = SettingsConfigDict(

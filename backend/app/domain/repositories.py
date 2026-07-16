@@ -13,6 +13,12 @@ from abc import ABC, abstractmethod
 from app.domain.conversation import ConversationTurn
 from app.domain.document import UploadedDocument
 from app.domain.enums import DocumentCategory
+from app.domain.extraction import (
+    DocumentUnderstanding,
+    ImageFacts,
+    PdfPageFacts,
+    RecognizedText,
+)
 from app.domain.session import Session
 
 
@@ -107,3 +113,80 @@ class FileStorage(ABC):
     @abstractmethod
     def exists(self, category: DocumentCategory, stored_filename: str) -> bool:
         """True if the file is present in storage."""
+
+
+class OCRProvider(ABC):
+    """
+    Recognition contract for turning IMAGE BYTES into text (Phase 7).
+
+    This port is the ONLY thing the application knows about OCR. The concrete
+    engine (Tesseract today; a cloud OCR API, PaddleOCR, or a vision LLM
+    tomorrow) lives in `app/infrastructure/ocr/` and is bound exactly once in
+    the composition root — no module outside that adapter may import
+    pytesseract or shell out to a tesseract binary.
+    """
+
+    @abstractmethod
+    def recognize(self, image_bytes: bytes) -> RecognizedText:
+        """
+        Recognize the text in one image (PNG/JPEG bytes).
+
+        Must handle rotated input (auto-detect orientation where the engine
+        supports it) and must NOT raise for a blank/unreadable image — return
+        empty text with zero confidence instead. Raises OCRFailedError only
+        when the engine itself is broken/unavailable.
+        """
+
+    @abstractmethod
+    def engine_name(self) -> str:
+        """Human-readable engine identifier for logs/metadata (e.g. 'tesseract 5.4')."""
+
+
+class DocumentInspector(ABC):
+    """
+    Low-level document introspection contract (Phase 7).
+
+    Everything that requires a PDF or imaging library (page counts, text
+    layers, rasterization, pixel statistics) sits behind this port, so PyMuPDF
+    and Pillow stay confined to `app/infrastructure/` exactly like Tesseract.
+    The DocumentAnalysisService consumes the raw facts and applies judgement.
+    """
+
+    @abstractmethod
+    def pdf_page_facts(self, pdf_bytes: bytes) -> tuple[PdfPageFacts, ...]:
+        """Structural facts per PDF page. Raises DocumentUnreadableError-worthy ValueError on corrupt PDFs."""
+
+    @abstractmethod
+    def pdf_page_text(self, pdf_bytes: bytes, page_number: int) -> str:
+        """The embedded text layer of one page (may be empty)."""
+
+    @abstractmethod
+    def render_pdf_page(self, pdf_bytes: bytes, page_number: int, dpi: int) -> bytes:
+        """Rasterize one PDF page to PNG bytes at the given DPI (for OCR)."""
+
+    @abstractmethod
+    def image_facts(self, image_bytes: bytes) -> ImageFacts:
+        """Pixel statistics of an image. Raises ValueError on undecodable bytes."""
+
+
+class DocumentUnderstandingRepository(ABC):
+    """
+    Persistence contract for cached pipeline results (Phase 7).
+
+    OCR is the most expensive step in the backend, so once a document has been
+    understood, the full DocumentUnderstanding record is cached here keyed by
+    document_id. Re-running the pipeline is idempotent; deleting the document
+    should drop the record too.
+    """
+
+    @abstractmethod
+    def save(self, record: DocumentUnderstanding) -> None:
+        """Store (or replace) the pipeline result for a document."""
+
+    @abstractmethod
+    def get(self, document_id: str) -> DocumentUnderstanding | None:
+        """Return the cached result, or None if the document was never processed."""
+
+    @abstractmethod
+    def delete(self, document_id: str) -> bool:
+        """Drop a cached result; return True if one existed."""
