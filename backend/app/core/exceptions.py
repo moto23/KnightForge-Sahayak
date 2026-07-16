@@ -124,6 +124,48 @@ class DuplicateDocumentError(DomainError):
         self.document_id = document_id
 
 
+# --------------------------------------------------------------------------- #
+# Phase 7 — Intelligent Document Understanding Pipeline
+# --------------------------------------------------------------------------- #
+
+
+class OCRFailedError(DomainError):
+    """Raised when the OCR engine itself fails or is unavailable (not a bad scan)."""
+
+    status_code = 502
+    code = "ocr_failed"
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(f"OCR engine failure: {detail}")
+
+
+class DocumentUnreadableError(DomainError):
+    """Raised when a document yields no usable text at all (blank/corrupt pages)."""
+
+    status_code = 422
+    code = "document_unreadable"
+
+    def __init__(self, document_id: str, detail: str) -> None:
+        super().__init__(
+            f"Document '{document_id}' could not be read: {detail}"
+        )
+        self.document_id = document_id
+
+
+class DocumentNotProcessedError(DomainError):
+    """Raised when results are requested for a document that was never OCR-processed."""
+
+    status_code = 404
+    code = "document_not_processed"
+
+    def __init__(self, document_id: str) -> None:
+        super().__init__(
+            f"Document '{document_id}' has not been processed yet. "
+            "Run POST /ocr first."
+        )
+        self.document_id = document_id
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Attach handlers that turn DomainErrors into consistent JSON responses."""
 

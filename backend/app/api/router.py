@@ -8,7 +8,7 @@ phases — main.py never needs to change per-feature.
 
 from fastapi import APIRouter
 
-from app.api.routes import conversation, forms, health, session, upload, validation
+from app.api.routes import conversation, forms, health, ocr, session, upload, validation
 
 api_router = APIRouter()
 api_router.include_router(health.router)
@@ -17,3 +17,4 @@ api_router.include_router(validation.router)
 api_router.include_router(session.router)
 api_router.include_router(conversation.router)
 api_router.include_router(upload.router)
+api_router.include_router(ocr.router)
