@@ -1,0 +1,20 @@
+{
+  "id": "voter_id",
+  "label": "Voter ID Card",
+  "kind": "identity_document",
+  "markers": {
+    "strong": ["election commission of india", "elector photo identity card"],
+    "weak": ["elector", "epic", "identity card", "assembly constituency", "elector's name"],
+    "min_score": 3
+  },
+  "fields": [
+    {"canonical": "name", "labels": ["elector's name", "electors name", "name"]},
+    {"canonical": "father_name", "labels": ["father's name", "fathers name", "relation's name", "relations name", "husband's name"]},
+    {"canonical": "gender", "labels": ["sex", "gender"], "document_wide": true},
+    {"canonical": "dob", "labels": ["date of birth", "dob"]},
+    {"canonical": "address", "labels": ["address"]},
+    {"canonical": "pincode", "labels": ["pin code", "pincode"]},
+    {"extra_key": "epic_number", "extra_label": "EPIC Number", "labels": ["epic no", "epic number"], "value_kind": "epic", "document_wide": true},
+    {"extra_key": "assembly_constituency", "extra_label": "Assembly Constituency", "labels": ["assembly constituency"]}
+  ]
+}

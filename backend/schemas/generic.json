@@ -1,0 +1,18 @@
+{
+  "id": "generic",
+  "label": "Unknown Document",
+  "kind": "unknown",
+  "markers": {
+    "strong": [],
+    "weak": [],
+    "min_score": 999
+  },
+  "fields": [
+    {"canonical": "pan", "labels": ["pan", "permanent account number"], "document_wide": true},
+    {"canonical": "aadhaar", "labels": ["aadhaar", "uid"], "document_wide": true},
+    {"canonical": "mobile", "labels": ["mobile"], "document_wide": true},
+    {"canonical": "email", "labels": ["e-mail", "email"], "document_wide": true},
+    {"canonical": "dob", "labels": ["date of birth", "dob"]},
+    {"canonical": "name", "labels": ["name"]}
+  ]
+}

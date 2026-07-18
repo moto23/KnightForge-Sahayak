@@ -17,7 +17,10 @@ import logging
 
 from fastapi import APIRouter, Depends
 
-from app.core.dependencies import get_document_understanding_service
+from app.core.dependencies import (
+    get_document_understanding_service,
+    get_upload_history_service,
+)
 from app.schemas.ocr import (
     OCRExtractResponse,
     OCRProcessRequest,
@@ -26,10 +29,21 @@ from app.schemas.ocr import (
     PrefillResponse,
 )
 from app.services.document_understanding_service import DocumentUnderstandingService
+from app.services.upload_history_service import UploadHistoryService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ocr", tags=["Document Understanding"])
+
+
+def _mark_ocr_history(
+    history: UploadHistoryService, document_id: str, *, ok: bool
+) -> None:
+    """Best-effort Phase 13 journal update — never fails the OCR request."""
+    try:
+        history.mark_ocr(document_id, ok=ok)
+    except Exception:  # noqa: BLE001
+        logger.warning("Upload history OCR update failed for %s", document_id)
 
 
 @router.post(
@@ -50,9 +64,15 @@ router = APIRouter(prefix="/ocr", tags=["Document Understanding"])
 async def run_ocr(
     body: OCRProcessRequest,
     pipeline: DocumentUnderstandingService = Depends(get_document_understanding_service),
+    history: UploadHistoryService = Depends(get_upload_history_service),
 ) -> OCRRunResponse:
     """Process one document through analysis + OCR (cached, idempotent)."""
-    record = pipeline.process(body.document_id, force=body.force)
+    try:
+        record = pipeline.process(body.document_id, force=body.force)
+    except Exception:
+        _mark_ocr_history(history, body.document_id, ok=False)
+        raise
+    _mark_ocr_history(history, body.document_id, ok=True)
     return OCRRunResponse.from_domain(record)
 
 
@@ -75,9 +95,15 @@ async def run_ocr(
 async def extract_fields(
     body: OCRProcessRequest,
     pipeline: DocumentUnderstandingService = Depends(get_document_understanding_service),
+    history: UploadHistoryService = Depends(get_upload_history_service),
 ) -> OCRExtractResponse:
     """Return the structured extraction for one document (cached, idempotent)."""
-    record = pipeline.process(body.document_id, force=body.force)
+    try:
+        record = pipeline.process(body.document_id, force=body.force)
+    except Exception:
+        _mark_ocr_history(history, body.document_id, ok=False)
+        raise
+    _mark_ocr_history(history, body.document_id, ok=True)
     return OCRExtractResponse.from_domain(record)
 
 
@@ -100,11 +126,16 @@ async def extract_fields(
 async def prefill_session(
     body: PrefillRequest,
     pipeline: DocumentUnderstandingService = Depends(get_document_understanding_service),
+    history: UploadHistoryService = Depends(get_upload_history_service),
 ) -> PrefillResponse:
     """Apply a document's accepted fields to an interview session."""
     report = pipeline.prefill_session(
         body.document_id, body.session_id, overwrite=body.overwrite
     )
+    try:
+        history.mark_processed(body.document_id)
+    except Exception:  # noqa: BLE001
+        logger.warning("Upload history prefill update failed for %s", body.document_id)
     return PrefillResponse.from_domain(report)
 
 

@@ -21,7 +21,7 @@ import shutil
 from pathlib import Path
 
 import pytesseract
-from PIL import Image
+from PIL import Image, ImageFilter, ImageOps
 
 from app.core.config import Settings, settings
 from app.core.exceptions import OCRFailedError
@@ -40,6 +40,14 @@ _WINDOWS_DEFAULT_PATHS = (
 # Below this mean confidence the page is treated as unreliable enough that the
 # provider retries with a different page-segmentation mode before giving up.
 _RETRY_CONFIDENCE = 0.40
+
+# The rescue ladder stops as soon as a pass reaches this confidence — extra
+# passes past "clearly readable" only burn seconds.
+_GOOD_ENOUGH = 0.75
+
+# Small-angle deskew candidates tried (degrees, both directions) when a page
+# stays dire after denoising — phone photos are rarely perfectly square.
+_DESKEW_ANGLES = (2, -2)
 
 # OSD must be at least this confident before we trust a rotation verdict —
 # low-confidence 180° flips on dense forms are usually wrong.
@@ -109,6 +117,9 @@ class TesseractOCRProvider(OCRProvider):
 
         image, rotation = self._auto_orient(image)
         gray = image.convert("L")  # grayscale: cheap, reliable accuracy boost
+        # Mild contrast normalization: washed-out photocopies and phone photos
+        # gain real accuracy; already-clean scans are barely touched.
+        gray = ImageOps.autocontrast(gray, cutoff=1)
 
         # Upscale small images: Tesseract accuracy collapses below ~20 px
         # glyph height, common in phone photos of forms.
@@ -122,12 +133,29 @@ class TesseractOCRProvider(OCRProvider):
 
         try:
             text, confidence, words = self._run(gray, psm=None)
-            # A dire first pass on a non-blank image sometimes means the page
-            # defeated the default segmentation — one retry in sparse mode.
+            # A dire first pass on a non-blank image means the page defeated
+            # the default settings — climb a bounded rescue ladder: sparse
+            # segmentation, median denoise, then small-angle deskew. Each
+            # rung keeps the best result; stop as soon as one reads cleanly.
             if confidence < _RETRY_CONFIDENCE and words > 0:
-                retry_text, retry_conf, retry_words = self._run(gray, psm=11)
-                if retry_conf > confidence:
-                    text, confidence, words = retry_text, retry_conf, retry_words
+                denoised = gray.filter(ImageFilter.MedianFilter(3))
+                ladder: list[tuple[Image.Image, int | None]] = [
+                    (gray, 11),        # sparse text mode
+                    (denoised, None),  # salt-and-pepper noise removed
+                    (denoised, 11),
+                ]
+                ladder += [
+                    (gray.rotate(angle, expand=True, fillcolor=255), None)
+                    for angle in _DESKEW_ANGLES
+                ]
+                for candidate_image, psm in ladder:
+                    retry_text, retry_conf, retry_words = self._run(
+                        candidate_image, psm=psm
+                    )
+                    if retry_conf > confidence:
+                        text, confidence, words = retry_text, retry_conf, retry_words
+                    if confidence >= _GOOD_ENOUGH:
+                        break
         except OCRFailedError:
             raise
         except Exception as exc:

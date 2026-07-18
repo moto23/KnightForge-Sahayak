@@ -17,6 +17,7 @@ from app.core.dependencies import (
     get_session_service,
 )
 from app.schemas.session import (
+    ClearAnswerResponse,
     CreateSessionResponse,
     DeleteSessionResponse,
     NextQuestionResponse,
@@ -107,6 +108,33 @@ async def submit_answer(
         result=outcome.result,
         session=SessionResponse.from_session(outcome.session),
         next_question=outcome.next_question,
+    )
+
+
+@router.delete(
+    "/{session_id}/answer/{field_id}",
+    response_model=ClearAnswerResponse,
+    summary="Clear one answer (prefill rollback)",
+    description=(
+        "Removes a field's stored answer (or invalid attempt) so it becomes "
+        "PENDING again, then recomputes progress, next question, and interview "
+        "status. Used to roll back AI-prefilled values when their source "
+        "document is deleted — the session never keeps data from a deleted "
+        "document. Idempotent for already-empty fields."
+    ),
+    responses={404: {"description": "Session or field not found."}},
+)
+async def clear_answer(
+    session_id: str,
+    field_id: str,
+    sessions: SessionService = Depends(get_session_service),
+) -> ClearAnswerResponse:
+    """Un-answer one field; all derived state is recomputed by the service."""
+    session = sessions.clear_answer(session_id, field_id)
+    return ClearAnswerResponse(
+        field_id=field_id,
+        cleared=True,
+        session=SessionResponse.from_session(session),
     )
 
 

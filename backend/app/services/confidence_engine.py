@@ -28,6 +28,7 @@ from app.domain.validators.result import ValidationResult
 _METHOD_WEIGHT: dict[ExtractionMethod, float] = {
     ExtractionMethod.PATTERN: 1.00,   # format is unambiguous (PAN, email…)
     ExtractionMethod.LABEL: 0.95,     # found right after the field's caption
+    ExtractionMethod.SEMANTIC: 0.92,  # AI-inferred; deterministic validation still rules
     ExtractionMethod.OPTION: 0.90,    # one schema option word on the line
 }
 

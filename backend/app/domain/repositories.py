@@ -19,6 +19,7 @@ from app.domain.extraction import (
     PdfPageFacts,
     RecognizedText,
 )
+from app.domain.pdf import GeneratedPdf, OverlayPlan
 from app.domain.session import Session
 
 
@@ -190,3 +191,60 @@ class DocumentUnderstandingRepository(ABC):
     @abstractmethod
     def delete(self, document_id: str) -> bool:
         """Drop a cached result; return True if one existed."""
+
+
+class PDFGenerator(ABC):
+    """
+    Rendering contract for producing a filled PDF (Phase 8).
+
+    The port receives the ORIGINAL template bytes plus a schema-free
+    OverlayPlan and returns the merged PDF bytes — template layout, fonts,
+    and spacing untouched, user data overlaid on top. The concrete adapter
+    (CoordinateOverlayPDFGenerator, built on PyMuPDF today) lives in
+    `app/infrastructure/pdf/`; no module outside that package may import a
+    PDF-writing library for generation.
+    """
+
+    @abstractmethod
+    def render(self, template_bytes: bytes, plan: OverlayPlan) -> bytes:
+        """
+        Merge the overlay plan onto the template and return the final PDF.
+
+        Raises ValueError for a corrupt/unopenable template and
+        PdfGenerationError-worthy RuntimeError for rendering failures —
+        the service layer maps both to typed DomainErrors.
+        """
+
+    @abstractmethod
+    def engine_name(self) -> str:
+        """Human-readable renderer identifier for logs (e.g. 'pymupdf 1.28')."""
+
+    @abstractmethod
+    def page_count(self, pdf_bytes: bytes) -> int:
+        """Number of pages in a PDF (for generated-file metadata)."""
+
+
+class GeneratedPdfRepository(ABC):
+    """
+    Persistence contract for generated-PDF METADATA (Phase 8).
+
+    Metadata only — the PDF bytes live on disk under generated_pdfs/ (via the
+    generation service). Same MVP pattern as the other in-memory stores: a
+    database adapter later implements this identical interface.
+    """
+
+    @abstractmethod
+    def add(self, record: GeneratedPdf) -> None:
+        """Store a new record. Raises on duplicate pdf_id."""
+
+    @abstractmethod
+    def get(self, pdf_id: str) -> GeneratedPdf | None:
+        """Return the record with this id, or None if it doesn't exist."""
+
+    @abstractmethod
+    def list_all(self) -> tuple[GeneratedPdf, ...]:
+        """Return every record, newest first."""
+
+    @abstractmethod
+    def delete(self, pdf_id: str) -> bool:
+        """Remove a record; return True if it existed."""

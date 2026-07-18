@@ -22,6 +22,7 @@ from app.api.router import api_router
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import setup_logging
+from app.infrastructure.db import init_db
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,11 @@ def create_app() -> FastAPI:
     # --- Error handling ---
     # Maps typed DomainErrors to consistent JSON error responses.
     register_exception_handlers(application)
+
+    # --- Database (Phase 12) ---
+    # Dev safety net: create any missing tables (no-op when Alembic already
+    # ran). Alembic (backend/alembic/) remains the source of truth for schema.
+    init_db()
 
     logger.info(
         "%s v%s started (env=%s, debug=%s)",

@@ -1,0 +1,23 @@
+{
+  "id": "aadhaar_card",
+  "label": "Aadhaar Card",
+  "kind": "identity_document",
+  "markers": {
+    "strong": ["unique identification authority", "uidai", "aadhaar"],
+    "weak": ["government of india", "mera aadhaar", "meri pehchan", "enrolment", "vid", "adhaar", "adhar"],
+    "patterns": ["\\b\\d{4}[ -]\\d{4}[ -]\\d{4}\\b"],
+    "min_score": 3
+  },
+  "fields": [
+    {"canonical": "name", "labels": ["name"]},
+    {"canonical": "dob", "labels": ["date of birth", "dob", "birth date"]},
+    {"canonical": "gender", "labels": ["gender"], "document_wide": true},
+    {"canonical": "aadhaar", "labels": ["aadhaar number", "aadhaar no", "your aadhaar no"], "document_wide": true},
+    {"canonical": "address", "labels": ["address"]},
+    {"canonical": "pincode", "labels": ["pin code", "pincode"], "document_wide": true},
+    {"canonical": "mobile", "labels": ["mobile"], "document_wide": true},
+    {"extra_key": "vid", "extra_label": "VID", "labels": ["vid"]},
+    {"extra_key": "year_of_birth", "extra_label": "Year of Birth", "labels": ["year of birth", "yob"], "value_kind": "number"},
+    {"extra_key": "enrolment_number", "extra_label": "Enrolment Number", "labels": ["enrolment no", "enrollment no"]}
+  ]
+}

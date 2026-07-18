@@ -1,0 +1,28 @@
+{
+  "id": "passport",
+  "label": "Passport",
+  "kind": "identity_document",
+  "markers": {
+    "strong": ["republic of india", "passport"],
+    "weak": ["passport no", "surname", "given name", "place of issue", "place of birth", "date of expiry", "nationality"],
+    "patterns": ["P<IND[A-Z<]{5,}", "\\b[A-Z][0-9]{7}\\b"],
+    "min_score": 4
+  },
+  "fields": [
+    {"canonical": "name", "labels": ["given name(s)", "given names", "given name", "name"]},
+    {"canonical": "father_name", "labels": ["name of father", "legal guardian", "father"]},
+    {"canonical": "dob", "labels": ["date of birth", "dob"]},
+    {"canonical": "gender", "labels": ["sex", "gender"], "document_wide": true},
+    {"canonical": "nationality", "labels": ["nationality"], "document_wide": true},
+    {"canonical": "address", "labels": ["address"]},
+    {"canonical": "pincode", "labels": ["pin code", "pincode", "pin"]},
+    {"extra_key": "passport_number", "extra_label": "Passport Number", "labels": ["passport no", "passport number"], "value_kind": "passport_no", "document_wide": true},
+    {"extra_key": "date_of_expiry", "extra_label": "Date of Expiry", "labels": ["date of expiry", "expiry date"], "value_kind": "date"},
+    {"extra_key": "date_of_issue", "extra_label": "Date of Issue", "labels": ["date of issue", "issue date"], "value_kind": "date"},
+    {"extra_key": "place_of_birth", "extra_label": "Place of Birth", "labels": ["place of birth"]},
+    {"extra_key": "place_of_issue", "extra_label": "Place of Issue", "labels": ["place of issue"]},
+    {"extra_key": "surname", "extra_label": "Surname", "labels": ["surname"]},
+    {"extra_key": "mother_name", "extra_label": "Name of Mother", "labels": ["name of mother", "mother"]},
+    {"extra_key": "mrz", "extra_label": "MRZ", "labels": [], "value_kind": "mrz", "document_wide": true}
+  ]
+}

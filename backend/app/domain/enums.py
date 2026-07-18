@@ -147,3 +147,17 @@ class ExtractionMethod(str, Enum):
     LABEL = "label_match"       # "PAN : ABCDE1234F" — value found after the field's label
     PATTERN = "pattern_match"   # value matched an unambiguous format (PAN, Aadhaar, email…)
     OPTION = "option_match"     # a schema option word found on the field's labelled line
+    SEMANTIC = "semantic_match" # inferred by the AI extractor (label-independent)
+
+
+class PlacementKind(str, Enum):
+    """
+    The kind of mark one overlay Placement paints onto the PDF (Phase 8).
+
+    The CoordinateMapper reduces every answer — text, choice, boolean, date —
+    to a flat list of these two primitives, so the PDF adapter needs zero
+    knowledge of the KYC schema.
+    """
+
+    TEXT = "text"            # draw a string at (x, y)
+    CHECKMARK = "checkmark"  # tick the checkbox centered at (x, y)

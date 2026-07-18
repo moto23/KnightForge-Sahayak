@@ -166,6 +166,227 @@ class DocumentNotProcessedError(DomainError):
         self.document_id = document_id
 
 
+# --------------------------------------------------------------------------- #
+# Phase 8 — Smart PDF Generation Engine
+# --------------------------------------------------------------------------- #
+
+
+class PdfTemplateNotFoundError(DomainError):
+    """Raised when the KYC template PDF or its coordinate map is missing on disk."""
+
+    status_code = 500
+    code = "pdf_template_missing"
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(f"PDF template unavailable: {detail}")
+
+
+class PdfTemplateCorruptError(DomainError):
+    """Raised when the template PDF or coordinate map exists but cannot be parsed."""
+
+    status_code = 500
+    code = "pdf_template_corrupt"
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(f"PDF template is corrupt: {detail}")
+
+
+class PdfGenerationError(DomainError):
+    """Raised when overlay rendering or the final write fails."""
+
+    status_code = 500
+    code = "pdf_generation_failed"
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(f"PDF generation failed: {detail}")
+
+
+class GeneratedPdfNotFoundError(DomainError):
+    """Raised when a requested generated-PDF id does not exist."""
+
+    status_code = 404
+    code = "pdf_not_found"
+
+    def __init__(self, pdf_id: str) -> None:
+        super().__init__(f"Generated PDF '{pdf_id}' was not found.")
+        self.pdf_id = pdf_id
+
+
+# --------------------------------------------------------------------------- #
+# Phase 10 — Knowledge RAG Engine
+# --------------------------------------------------------------------------- #
+
+
+class KnowledgeUnavailableError(DomainError):
+    """Raised when the RAG stack (chromadb / sentence-transformers) is not installed."""
+
+    status_code = 503
+    code = "knowledge_unavailable"
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(f"Knowledge engine unavailable: {detail}")
+
+
+class KnowledgeIndexEmptyError(DomainError):
+    """Raised when a query arrives before any documents have been indexed."""
+
+    status_code = 409
+    code = "knowledge_index_empty"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "The knowledge index is empty. Run POST /knowledge/index first."
+        )
+
+
+class KnowledgeCorpusMissingError(DomainError):
+    """Raised when indexing finds no ingestible documents in the corpus directory."""
+
+    status_code = 404
+    code = "knowledge_corpus_missing"
+
+    def __init__(self, directory: str) -> None:
+        super().__init__(
+            f"No knowledge documents (.md/.txt/.pdf) found in '{directory}'."
+        )
+        self.directory = directory
+
+
+# --------------------------------------------------------------------------- #
+# Phase 11 — Universal Document Intelligence
+# --------------------------------------------------------------------------- #
+
+
+class DocumentSchemasMissingError(DomainError):
+    """Raised when no document-schema JSON files could be loaded from disk."""
+
+    status_code = 500
+    code = "document_schemas_missing"
+
+    def __init__(self, directory: str) -> None:
+        super().__init__(
+            f"No document schemas (*.json) found in '{directory}'. "
+            "The Universal Document Intelligence pipeline cannot run without them."
+        )
+        self.directory = directory
+
+
+class ConflictNotFoundError(DomainError):
+    """Raised when a resolution is requested for a field that has no open conflict."""
+
+    status_code = 404
+    code = "conflict_not_found"
+
+    def __init__(self, canonical_id: str) -> None:
+        super().__init__(
+            f"No conflict exists for canonical field '{canonical_id}'."
+        )
+        self.canonical_id = canonical_id
+
+
+class InvalidConflictResolutionError(DomainError):
+    """Raised when a conflict resolution names a value/document not among the candidates."""
+
+    status_code = 422
+    code = "invalid_conflict_resolution"
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(f"Invalid conflict resolution: {detail}")
+
+
+class InvalidPrimaryFormError(DomainError):
+    """Raised when the selected primary form is not an installed KYC form schema."""
+
+    status_code = 422
+    code = "invalid_primary_form"
+
+    def __init__(self, form_id: str) -> None:
+        super().__init__(
+            f"'{form_id}' is not an installed KYC form schema — pick one of the "
+            "supported primary forms."
+        )
+        self.form_id = form_id
+
+
+# --------------------------------------------------------------------------- #
+# Phase 12 — Authentication + Conversation Persistence
+# --------------------------------------------------------------------------- #
+
+
+class EmailAlreadyRegisteredError(DomainError):
+    """Raised when registering with an email that already has an account."""
+
+    status_code = 409
+    code = "email_registered"
+
+    def __init__(self, email: str) -> None:
+        super().__init__(f"An account with '{email}' already exists — sign in instead.")
+
+
+class InvalidCredentialsError(DomainError):
+    """Raised when email/password authentication fails (never says which)."""
+
+    status_code = 401
+    code = "invalid_credentials"
+
+    def __init__(self) -> None:
+        super().__init__("Incorrect email or password.")
+
+
+class AuthRequiredError(DomainError):
+    """Raised when a protected endpoint is called without a valid access token."""
+
+    status_code = 401
+    code = "auth_required"
+
+    def __init__(self, detail: str = "Sign in to use this feature.") -> None:
+        super().__init__(detail)
+
+
+class InvalidRefreshTokenError(DomainError):
+    """Raised when the refresh cookie is missing, expired, revoked, or reused."""
+
+    status_code = 401
+    code = "invalid_refresh_token"
+
+    def __init__(self, detail: str = "Your session has expired — sign in again.") -> None:
+        super().__init__(detail)
+
+
+class ChatNotFoundError(DomainError):
+    """Raised when a chat doesn't exist OR isn't owned by the caller (same 404)."""
+
+    status_code = 404
+    code = "chat_not_found"
+
+    def __init__(self, chat_id: str) -> None:
+        super().__init__(f"Conversation '{chat_id}' was not found.")
+        self.chat_id = chat_id
+
+
+class OAuthNotConfiguredError(DomainError):
+    """Raised when Google sign-in is attempted without configured credentials."""
+
+    status_code = 503
+    code = "oauth_not_configured"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Google sign-in is not configured. Set GOOGLE_CLIENT_ID and "
+            "GOOGLE_CLIENT_SECRET in backend/.env."
+        )
+
+
+class OAuthFailedError(DomainError):
+    """Raised when the Google OAuth exchange fails (bad code, network, etc.)."""
+
+    status_code = 502
+    code = "oauth_failed"
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(f"Google sign-in failed: {detail}")
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Attach handlers that turn DomainErrors into consistent JSON responses."""
 

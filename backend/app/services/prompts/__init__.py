@@ -6,5 +6,13 @@ complete prompts. Full design rationale: docs/prompt-design.md.
 """
 
 from app.services.prompts.builder import PromptBuilder, PromptBundle, prompt_builder
+from app.services.prompts.chat import build_standalone_question_prompt
+from app.services.prompts.knowledge import build_knowledge_prompt
 
-__all__ = ["PromptBuilder", "PromptBundle", "prompt_builder"]
+__all__ = [
+    "PromptBuilder",
+    "PromptBundle",
+    "build_knowledge_prompt",
+    "build_standalone_question_prompt",
+    "prompt_builder",
+]

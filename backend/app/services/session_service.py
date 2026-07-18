@@ -124,6 +124,32 @@ class SessionService:
         )
         return session, result
 
+    def clear_answer(self, session_id: str, field_id: str) -> Session:
+        """
+        Remove one field's stored answer (and/or invalid attempt) entirely,
+        returning the field to PENDING — then recompute all derived state.
+
+        This is NOT the same as submitting a blank value: for a required field
+        a blank submission records an invalid attempt, whereas clearing erases
+        the field from both maps. Used to roll back AI-prefilled values when
+        their source document is deleted. Idempotent for already-empty fields;
+        unknown ids raise the typed 404s (SessionNotFoundError /
+        KYCFieldNotFoundError via FormService.get_field).
+        """
+        session = self.get_session(session_id)
+        self._forms.get_field(field_id)  # typed 404 for unknown field ids
+
+        session.answers.pop(field_id, None)
+        session.validation_errors.pop(field_id, None)
+
+        self._refresh(session)
+        session.touch()
+        self._repository.save(session)
+        logger.info(
+            "Answer for '%s' cleared on session %s", field_id, session.session_id
+        )
+        return session
+
     # ---------------------------------------------------------- derived state
 
     def _refresh(self, session: Session) -> None:

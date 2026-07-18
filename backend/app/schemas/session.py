@@ -118,3 +118,13 @@ class DeleteSessionResponse(BaseModel):
 
     session_id: str = Field(..., description="The session that was deleted.")
     deleted: bool = Field(..., description="Always true on success (404 otherwise).")
+
+
+class ClearAnswerResponse(BaseModel):
+    """Response for DELETE /session/{id}/answer/{field_id} — prefill rollback."""
+
+    field_id: str = Field(..., description="The field whose answer was cleared.")
+    cleared: bool = Field(..., description="Always true on success (404 otherwise).")
+    session: SessionResponse = Field(
+        ..., description="Refreshed session state (progress/next recomputed)."
+    )

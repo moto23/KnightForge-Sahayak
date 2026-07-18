@@ -10,16 +10,26 @@ global handlers (400 empty_file, 413 file_too_large, 415 unsupported_file_type,
 
 import logging
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
 
-from app.core.dependencies import get_document_understanding_service, get_upload_service
+from app.core.dependencies import (
+    get_current_user,
+    get_document_understanding_service,
+    get_optional_user,
+    get_upload_history_service,
+    get_upload_service,
+)
+from app.infrastructure.db.models import User
 from app.schemas.upload import (
     DeleteUploadResponse,
     DocumentMetadataResponse,
     ListUploadsResponse,
+    UploadHistoryItemResponse,
+    UploadHistoryResponse,
     UploadResponse,
 )
 from app.services.document_understanding_service import DocumentUnderstandingService
+from app.services.upload_history_service import UploadHistoryService
 from app.services.upload_service import UploadService
 
 logger = logging.getLogger(__name__)
@@ -46,13 +56,56 @@ router = APIRouter(prefix="/upload", tags=["Document Upload"])
 )
 async def upload_document(
     file: UploadFile = File(..., description="The PDF or image to upload."),
+    document_type: str = Form(
+        "other",
+        description=(
+            "User-selected document type: kyc_form, pan_card, aadhaar_card, "
+            "passport, driving_licence, bank_statement, utility_bill, other."
+        ),
+    ),
     uploads: UploadService = Depends(get_upload_service),
+    history: UploadHistoryService = Depends(get_upload_history_service),
+    user: User | None = Depends(get_optional_user),
 ) -> UploadResponse:
     """Validate and store one uploaded document; return its metadata."""
     document = await uploads.store_upload(file)
+    try:
+        # Best-effort journal (Phase 13) — history must never fail an upload.
+        history.record_upload(
+            document_id=document.document_id,
+            filename=document.original_filename,
+            document_type=document_type,
+            file_size=document.file_size,
+            user_id=user.id if user else None,
+        )
+    except Exception:  # noqa: BLE001
+        logger.warning("Upload history write failed for %s", document.document_id)
     return UploadResponse(
         message="File uploaded successfully.",
         document=DocumentMetadataResponse.from_document(document),
+    )
+
+
+@router.get(
+    "/history",
+    response_model=UploadHistoryResponse,
+    summary="Your persistent upload history",
+    description=(
+        "Every document the signed-in account has uploaded, newest first — "
+        "filename, selected/detected type, OCR status, processing status. "
+        "Survives restarts (SQLite). Guests have no history (sign in to keep one)."
+    ),
+    responses={401: {"description": "Sign in to see your upload history."}},
+)
+async def upload_history(
+    user: User = Depends(get_current_user),
+    history: UploadHistoryService = Depends(get_upload_history_service),
+) -> UploadHistoryResponse:
+    """Return the caller's upload-history rows, newest first."""
+    rows = history.list_for_user(user.id)
+    return UploadHistoryResponse(
+        total=len(rows),
+        items=[UploadHistoryItemResponse.from_row(row) for row in rows],
     )
 
 
@@ -87,6 +140,34 @@ async def get_document(
     return DocumentMetadataResponse.from_document(uploads.get_document(document_id))
 
 
+@router.get(
+    "/{document_id}/file",
+    summary="View the original uploaded file",
+    description=(
+        "Streams the stored bytes back with the document's canonical content "
+        "type (inline disposition), so the frontend can preview exactly what "
+        "was uploaded — persisting across OCR, refresh, and navigation."
+    ),
+    responses={404: {"description": "Document not found."}},
+    response_class=Response,
+)
+async def get_document_file(
+    document_id: str,
+    uploads: UploadService = Depends(get_upload_service),
+) -> Response:
+    """Return the raw stored bytes for in-browser document preview."""
+    document = uploads.get_document(document_id)
+    content = uploads.read_content(document)
+    return Response(
+        content=content,
+        media_type=document.content_type,
+        headers={
+            # stored_filename is <uuid><ext> — always header-safe ASCII.
+            "Content-Disposition": f'inline; filename="{document.stored_filename}"',
+        },
+    )
+
+
 @router.delete(
     "/{document_id}",
     response_model=DeleteUploadResponse,
@@ -100,8 +181,13 @@ async def delete_document(
     understanding: DocumentUnderstandingService = Depends(
         get_document_understanding_service
     ),
+    history: UploadHistoryService = Depends(get_upload_history_service),
 ) -> DeleteUploadResponse:
     """Delete one uploaded document (bytes + metadata + cached OCR results)."""
     uploads.delete_document(document_id)
     understanding.forget(document_id)  # drop any cached Phase 7 pipeline result
+    try:
+        history.mark_deleted(document_id)  # keep the audit row, flip its status
+    except Exception:  # noqa: BLE001
+        logger.warning("Upload history update failed for %s", document_id)
     return DeleteUploadResponse(document_id=document_id, deleted=True)

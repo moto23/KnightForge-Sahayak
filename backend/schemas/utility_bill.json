@@ -1,0 +1,19 @@
+{
+  "id": "utility_bill",
+  "label": "Utility Bill",
+  "kind": "identity_document",
+  "markers": {
+    "strong": ["electricity bill", "bill of supply", "units consumed"],
+    "weak": ["bill no", "meter", "consumer", "tariff", "billing period", "amount payable", "due date", "electricity"],
+    "min_score": 3
+  },
+  "fields": [
+    {"canonical": "name", "labels": ["consumer name", "customer name", "name"]},
+    {"canonical": "address", "labels": ["supply address", "billing address", "address"]},
+    {"canonical": "pincode", "labels": ["pin code", "pincode"], "document_wide": true},
+    {"canonical": "mobile", "labels": ["mobile", "registered mobile"], "document_wide": true},
+    {"canonical": "email", "labels": ["e-mail", "email"], "document_wide": true},
+    {"extra_key": "consumer_number", "extra_label": "Consumer Number", "labels": ["consumer no", "consumer number", "ca no"], "value_kind": "number"},
+    {"extra_key": "billing_period", "extra_label": "Billing Period", "labels": ["billing period", "bill period", "bill month"]}
+  ]
+}

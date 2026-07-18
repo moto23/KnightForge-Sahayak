@@ -1,0 +1,27 @@
+{
+  "id": "cvl_kyc",
+  "label": "CVL KYC Form",
+  "kind": "kyc_form",
+  "markers": {
+    "strong": ["know your client", "cdsl ventures"],
+    "weak": ["kyc", "application form", "identity details", "for individuals only", "in person verification"],
+    "min_score": 4
+  },
+  "fields": [
+    {"canonical": "father_name", "labels": ["father's/spouse name", "father spouse name", "fathers name", "father's name"]},
+    {"canonical": "name", "labels": ["name of applicant", "full name", "name"]},
+    {"canonical": "dob", "labels": ["date of birth", "dob"]},
+    {"canonical": "gender", "labels": ["gender"]},
+    {"canonical": "nationality", "labels": ["nationality"]},
+    {"canonical": "pan", "labels": ["pan", "permanent account number"], "document_wide": true},
+    {"canonical": "aadhaar", "labels": ["aadhaar", "uid", "unique identification number"], "document_wide": true},
+    {"canonical": "address", "labels": ["address for correspondence", "correspondence address", "address"]},
+    {"canonical": "city", "labels": ["city/town/village", "city town village", "city"]},
+    {"canonical": "state", "labels": ["state"]},
+    {"canonical": "pincode", "labels": ["pin code", "pincode"]},
+    {"canonical": "mobile", "labels": ["mobile"], "document_wide": true},
+    {"canonical": "email", "labels": ["e-mail id", "email id", "e-mail", "email"], "document_wide": true},
+    {"canonical": "income", "labels": ["gross annual income", "annual income"]},
+    {"canonical": "occupation", "labels": ["occupation"]}
+  ]
+}

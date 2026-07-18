@@ -1,0 +1,23 @@
+{
+  "id": "driving_licence",
+  "label": "Driving Licence",
+  "kind": "identity_document",
+  "markers": {
+    "strong": ["driving licence", "driving license"],
+    "weak": ["motor vehicle", "transport department", "dl no", "licence no", "cov", "issued by", "valid till"],
+    "patterns": ["\\b[A-Z]{2}[- ]?\\d{2}[- ]?\\d{4}[- ]?\\d{7}\\b"],
+    "min_score": 3
+  },
+  "fields": [
+    {"canonical": "name", "labels": ["name"]},
+    {"canonical": "father_name", "labels": ["son/daughter/wife of", "s/d/w of", "father"]},
+    {"canonical": "dob", "labels": ["date of birth", "dob"]},
+    {"canonical": "address", "labels": ["address"]},
+    {"canonical": "pincode", "labels": ["pin code", "pincode", "pin"]},
+    {"extra_key": "licence_number", "extra_label": "Licence Number", "labels": ["dl no", "licence no", "license no", "dl number"]},
+    {"extra_key": "valid_till", "extra_label": "Valid Till", "labels": ["valid till", "validity", "valid until"], "value_kind": "date"},
+    {"extra_key": "valid_from", "extra_label": "Valid From", "labels": ["valid from"], "value_kind": "date"},
+    {"extra_key": "date_of_issue", "extra_label": "Date of Issue", "labels": ["date of issue", "issue date", "doi"], "value_kind": "date"},
+    {"extra_key": "blood_group", "extra_label": "Blood Group", "labels": ["blood group", "bg"]}
+  ]
+}

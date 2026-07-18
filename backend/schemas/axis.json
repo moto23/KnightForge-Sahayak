@@ -1,0 +1,27 @@
+{
+  "id": "axis_kyc",
+  "label": "Axis Bank KYC Form",
+  "kind": "kyc_form",
+  "markers": {
+    "strong": ["axis bank"],
+    "weak": ["axis", "kyc", "know your customer", "customer information", "application form", "customer id"],
+    "min_score": 4
+  },
+  "fields": [
+    {"canonical": "father_name", "labels": ["father's/spouse name", "father's name", "fathers name", "spouse name"]},
+    {"canonical": "name", "labels": ["name of the customer", "customer name", "name of applicant", "applicant name", "full name", "name"]},
+    {"canonical": "dob", "labels": ["date of birth", "dob"]},
+    {"canonical": "gender", "labels": ["gender", "sex"]},
+    {"canonical": "nationality", "labels": ["nationality"]},
+    {"canonical": "pan", "labels": ["pan", "permanent account number", "pan no"], "document_wide": true},
+    {"canonical": "aadhaar", "labels": ["aadhaar", "aadhaar number", "uid"], "document_wide": true},
+    {"canonical": "address", "labels": ["communication address", "correspondence address", "current address", "residential address", "address"]},
+    {"canonical": "city", "labels": ["city/town/village", "city", "town"]},
+    {"canonical": "state", "labels": ["state"]},
+    {"canonical": "pincode", "labels": ["pin code", "pincode", "pin"]},
+    {"canonical": "mobile", "labels": ["mobile no", "mobile number", "mobile"], "document_wide": true},
+    {"canonical": "email", "labels": ["e-mail id", "email id", "e-mail", "email"], "document_wide": true},
+    {"canonical": "income", "labels": ["gross annual income", "annual income", "income range", "income"]},
+    {"canonical": "occupation", "labels": ["occupation type", "occupation", "nature of business"]}
+  ]
+}
