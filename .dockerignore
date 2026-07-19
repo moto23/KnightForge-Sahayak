@@ -1,0 +1,58 @@
+# Build context is the REPOSITORY ROOT (see backend/Dockerfile), so the
+# exclusions live here rather than in backend/.
+#
+# An image layer is permanent and distributable: anything copied in can be
+# extracted by anyone who pulls the image, even if a later layer deletes it.
+
+# --- Secrets -------------------------------------------------------------- #
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+
+# --- Runtime applicant data (must come from the DB / object store) --------- #
+backend/uploads/
+backend/generated_pdfs/
+backend/_restart_state.json
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/*.sqlite
+**/*.sqlite3
+
+# --- The frontend is deployed separately to Vercel ------------------------- #
+frontend/
+node_modules/
+
+# --- Fixtures and docs not needed to serve traffic ------------------------- #
+# samples/sample-kyc.pdf is copied explicitly by the Dockerfile; everything
+# else under samples/ is test material, including synthetic applicant data.
+samples/docs/
+samples/forms/
+samples/fake-user-data.json
+samples/sample-kyc-filled.pdf
+samples/sample-kyc.jpg
+docs/
+assets/
+backend/e2e_*.py
+
+# --- Local Python environment (wrong platform, and huge) ------------------- #
+**/.venv/
+**/venv/
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/
+**/.pytest_cache/
+**/.mypy_cache/
+.coverage
+htmlcov/
+
+# --- Git / logs / OS / IDE ------------------------------------------------- #
+.git/
+.github/
+**/*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
