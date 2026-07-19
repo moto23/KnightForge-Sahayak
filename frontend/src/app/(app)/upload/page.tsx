@@ -71,6 +71,9 @@ export default function UploadPage() {
   const [primaryForm, setPrimaryForm] = React.useState<string>(PRIMARY_FORMS[0].value);
   // Last primary-form id the backend has confirmed for this session.
   const syncedFormRef = React.useRef<string | null>(null);
+  // Latest profile snapshot, readable by the document-list load regardless of
+  // which of the two concurrent requests resolves first.
+  const profileRef = React.useRef<UnifiedProfileResponse | null>(null);
 
   const labelOf = React.useCallback(
     (fieldId: string) => fieldMap.get(fieldId)?.display_name ?? fieldId,
@@ -134,6 +137,10 @@ export default function UploadPage() {
   const applyProfileSnapshot = React.useCallback(
     (snapshot: UnifiedProfileResponse) => {
       setProfile(snapshot);
+      // Also kept in a ref: the profile can now land BEFORE the document
+      // list, and a snapshot that arrives first would otherwise patch an
+      // empty list and lose every doc-type badge.
+      profileRef.current = snapshot;
       if (snapshot.primary_form) {
         // The backend's stored choice wins (e.g. restored after a refresh).
         syncedFormRef.current = snapshot.primary_form.schema_id;
@@ -182,8 +189,19 @@ export default function UploadPage() {
     [applyProfileSnapshot],
   );
 
+  /*
+   * The merged profile depends only on the session id, never on the document
+   * list — but waiting for listState === "ready" chained it behind the list
+   * AND every per-document understanding fetch, so the doc-type badges landed
+   * two round trips late. It now starts as soon as a session exists.
+   *
+   * Ordering is no longer guaranteed, so both directions are covered: the
+   * snapshot is kept in a ref for docs that arrive after it (see
+   * fetchExisting's consumer), while applyProfileSnapshot still patches docs
+   * that arrived before it.
+   */
   React.useEffect(() => {
-    if (!sessionId || listState !== "ready") return;
+    if (!sessionId) return;
     let cancelled = false;
     intelligenceService
       .profile(sessionId)
@@ -196,14 +214,26 @@ export default function UploadPage() {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, listState, applyProfileSnapshot]);
+  }, [sessionId, applyProfileSnapshot]);
 
   React.useEffect(() => {
     let cancelled = false;
     fetchExisting()
       .then((restored) => {
         if (cancelled) return;
-        setDocs(restored);
+        // Apply any profile snapshot that won the race (see the profile
+        // effect) so badges survive either arrival order.
+        const snapshot = profileRef.current;
+        setDocs(
+          snapshot
+            ? restored.map((d) => {
+                const summary = snapshot.documents.find(
+                  (doc) => doc.document_id === d.documentId,
+                );
+                return summary ? { ...d, docType: summary.document_type } : d;
+              })
+            : restored,
+        );
         setListState("ready");
       })
       .catch((err: unknown) => {

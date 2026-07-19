@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 
+import { BackendStatusBanner } from "@/components/shared/backend-status-banner";
 import { ProfileMenu } from "@/components/navigation/profile-menu";
 import { SidebarNav } from "@/components/navigation/sidebar";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
@@ -163,6 +164,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <ThemeToggle />
           <ProfileMenu />
         </header>
+
+        {/* Cold-start explainer — silent while the backend is warm. */}
+        <BackendStatusBanner />
 
         {/* Animated page content */}
         <main id="main-content" className="flex-1">

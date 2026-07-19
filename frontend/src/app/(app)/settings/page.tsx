@@ -33,7 +33,8 @@ const THEME_OPTIONS = [
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const mounted = useMounted();
-  const { user, isAuthenticated, updateProfile, logout, logoutAll } = useAuth();
+  const { user, isAuthenticated, restoring, updateProfile, logout, logoutAll } =
+    useAuth();
   const [displayName, setDisplayName] = React.useState("Guest");
   const [savingName, setSavingName] = React.useState(false);
   const [signingOut, setSigningOut] = React.useState<"one" | "all" | null>(null);
@@ -90,7 +91,8 @@ export default function SettingsPage() {
       <PageHeader
         title="Settings"
         description={
-          isAuthenticated
+          // While restoring, the neutral wording — it claims neither state.
+          isAuthenticated || restoring
             ? "Appearance, account, and interview preferences."
             : "Appearance and interview preferences. Sign in to sync your profile and conversation history."
         }
@@ -101,13 +103,29 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle>Account</CardTitle>
           <CardDescription>
-            {isAuthenticated
-              ? "Your Sahayak account and active sessions."
-              : "You're using Sahayak as a guest — everything works, nothing is saved."}
+            {restoring
+              ? "Checking your session…"
+              : isAuthenticated
+                ? "Your Sahayak account and active sessions."
+                : "You're using Sahayak as a guest — everything works, nothing is saved."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {isAuthenticated && user ? (
+          {/*
+            Only THIS card waits on auth. Calling a returning user a guest
+            before the restore has answered was the same premature signed-out
+            render the topbar had; the rest of the page (appearance, interview
+            preferences) needs no session and stays interactive throughout.
+          */}
+          {restoring ? (
+            <div className="flex items-center gap-3" aria-label="Checking your session">
+              <div className="size-10 shrink-0 animate-pulse rounded-full bg-muted" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="h-3.5 w-40 animate-pulse rounded bg-muted" />
+                <div className="h-3 w-56 animate-pulse rounded bg-muted" />
+              </div>
+            </div>
+          ) : isAuthenticated && user ? (
             <>
               <div className="flex flex-wrap items-center gap-3">
                 <span className="grid size-10 place-items-center rounded-full bg-primary/15 text-sm font-semibold text-primary">

@@ -183,8 +183,16 @@ ${next.question.display_name}${next.question.help_text ? ` — ${next.question.h
     setPhase("booting");
     try {
       if (sessionId) {
-        // Resume: fetch the next question for the existing session.
-        const next = await sessionService.nextQuestion(sessionId);
+        /*
+         * Resume: the next question and a fresh session/progress snapshot are
+         * independent reads of the same session, so they overlap. This used
+         * to be nextQuestion THEN refresh, which put two full round trips
+         * back to back behind "Preparing your interview…".
+         */
+        const [next] = await Promise.all([
+          sessionService.nextQuestion(sessionId),
+          refresh(),
+        ]);
         setCurrentQuestion(next.question);
         if (next.completed) {
           setMessages([
@@ -216,9 +224,10 @@ ${next.question.display_name}${next.question.help_text ? ` — ${next.question.h
         setMessages([
           { id: nextId(), role: "assistant", at: now(), content: started.message },
         ]);
+        // adoptSession already loads session + progress for the new id, so
+        // the refresh() that used to run here was a second identical fetch.
         await adoptSession(started.session_id);
       }
-      await refresh();
       setPhase("ready");
     } catch (err) {
       setBootError(toApiError(err).message);

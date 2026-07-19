@@ -178,25 +178,38 @@ export function KycSessionProvider({
     let cancelled = false;
 
     (async () => {
-      // Schema (independent of any session).
-      try {
-        const schemaResponse = await formsService.getSchema();
-        if (!cancelled) setSchema(schemaResponse.form);
-      } catch (err) {
-        if (!cancelled) setError(toApiError(err));
+      const storedId = readStoredSessionId();
+
+      /*
+       * The form schema and the stored session are INDEPENDENT reads, and
+       * awaiting the schema first made every consumer of this context pay
+       * both round trips end to end before anything rendered. Overlapping
+       * them makes the restore cost max(schema, session) instead of the sum.
+       *
+       * allSettled rather than two bare promises: it attaches handlers to
+       * both immediately, so a session that fails fast while the schema is
+       * still in flight cannot surface as an unhandled rejection. Each
+       * outcome is still handled exactly as it was before.
+       */
+      const [schemaResult, sessionResult] = await Promise.allSettled([
+        formsService.getSchema(),
+        storedId ? loadSession(storedId) : Promise.resolve(null),
+      ]);
+
+      if (schemaResult.status === "fulfilled") {
+        if (!cancelled) setSchema(schemaResult.value.form);
+      } else if (!cancelled) {
+        setError(toApiError(schemaResult.reason));
       }
 
-      // Resume a stored session, if any.
-      const storedId = readStoredSessionId();
       if (storedId) {
-        try {
-          await loadSession(storedId);
+        if (sessionResult.status === "fulfilled") {
           if (!cancelled) {
             storeSessionId(storedId);
             storePrefillMap(readPrefillMap(storedId));
           }
-        } catch (err) {
-          const apiError = toApiError(err);
+        } else {
+          const apiError = toApiError(sessionResult.reason);
           if (apiError.status === 404) {
             // Backend restarted (in-memory store) — stale id, start fresh.
             window.localStorage.removeItem(SESSION_KEY);
