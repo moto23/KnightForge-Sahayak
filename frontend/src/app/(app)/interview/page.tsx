@@ -238,10 +238,26 @@ ${next.question.display_name}${next.question.help_text ? ` — ${next.question.h
   }, [sessionId, adoptSession, refresh]);
 
   React.useEffect(() => {
-    if (restoring || bootedRef.current) return;
+    /*
+     * Wait for the backend to be reachable before booting the interview.
+     *
+     * The fresh-start path POSTs /conversation/start, which CREATES a session
+     * — non-idempotent, so the API client (correctly) never retries it. Fired
+     * at a container that is still waking, that single attempt was spent
+     * waiting on a queued request and abandoned at the client ceiling, which
+     * is exactly the "Couldn't start the interview — the backend took too
+     * long to respond" seen in production after minutes of waiting.
+     *
+     * The shared probe already absorbs the cold start with bounded retries on
+     * an idempotent GET /health, so gating on it means the interview's own
+     * requests only ever meet a backend that has answered. Raising the
+     * timeout instead would have kept firing a one-shot mutation into a
+     * sleeping container and just waited longer before giving up.
+     */
+    if (restoring || backend.isWaking || bootedRef.current) return;
     bootedRef.current = true;
     void boot();
-  }, [restoring, boot]);
+  }, [restoring, backend.isWaking, boot]);
 
   /* --- send a reply ----------------------------------------------------- */
   const send = async (retryOf?: string) => {

@@ -14,6 +14,10 @@ import type {
 // run); querying loads the model lazily too — both need patient timeouts.
 const INDEX_TIMEOUT_MS = 300_000;
 const QUERY_TIMEOUT_MS = 90_000;
+// The FIRST status call can trigger lazy ONNX/Chroma initialisation on the
+// backend, and it gates the whole Knowledge Chat page. The 20s default was
+// short enough that a slow-but-healthy engine looked unreachable.
+const STATUS_TIMEOUT_MS = 45_000;
 
 export const knowledgeService = {
   /** POST /knowledge/index — (re)build the vector index from the corpus. */
@@ -37,5 +41,8 @@ export const knowledgeService = {
 
   /** GET /knowledge/status — engine readiness + index size + config. */
   status: (signal?: AbortSignal) =>
-    api.get<KnowledgeStatusResponse>("/knowledge/status", { signal }),
+    api.get<KnowledgeStatusResponse>("/knowledge/status", {
+      signal,
+      timeoutMs: STATUS_TIMEOUT_MS,
+    }),
 };

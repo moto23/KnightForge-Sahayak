@@ -24,7 +24,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/auth-context";
-import { toApiError } from "@/services/api-client";
+import { useBackendStatus } from "@/hooks/use-backend-status";
+import { ApiError, toApiError } from "@/services/api-client";
 import { chatsService, knowledgeService } from "@/services";
 import { useKycSession } from "@/hooks/use-kyc-session";
 import type {
@@ -44,12 +45,42 @@ type UiMessage = {
   confident?: boolean;
   /** Assistant-only: "extractive-fallback" when the LLM was offline. */
   generator?: string;
+  /**
+   * Assistant-only: the REQUEST failed (network, timeout, 5xx, Gemini error).
+   * Kept separate from `confident` on purpose — reusing confident:false here
+   * meant an infrastructure failure rendered as "not covered by the
+   * documents", i.e. the app blamed the corpus for a network problem.
+   */
+  failed?: boolean;
+  /** The question that produced this failure, for one-tap retry. */
+  retryQuestion?: string;
 };
 
 let messageCounter = 0;
 const nextId = () => `k-${++messageCounter}`;
 const now = () =>
   new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+/**
+ * Turn a failed ASK into an honest, specific sentence.
+ *
+ * The distinction that matters: none of these mean the corpus lacks the
+ * answer. They mean we never got one. "Not covered by the documents" is
+ * reserved exclusively for a SUCCESSFUL retrieval that found insufficient
+ * evidence.
+ */
+function knowledgeFailureText(error: ApiError): string {
+  if (error.isTimeout) {
+    return "That took too long to answer — the server may be busy or waking up. Your question wasn't lost; try again.";
+  }
+  if (error.isNetworkError) {
+    return "I couldn't reach the knowledge engine just now. The server may be waking up — try again in a moment.";
+  }
+  if (error.status >= 500) {
+    return "The knowledge engine hit a problem answering that. This is a server-side hiccup, not a gap in the documents — try again.";
+  }
+  return `I couldn't answer that (${error.message}).`;
+}
 
 const WELCOME =
   "Hi! I answer questions about KYC rules, accepted documents and the KRA process — grounded in the official reference documents, with citations. If the documents don't cover something, I'll say so instead of guessing.";
@@ -75,6 +106,7 @@ const SUGGESTED_QUESTIONS = [
  */
 export default function KnowledgePage() {
   const { isAuthenticated, restoring } = useAuth();
+  const backend = useBackendStatus();
   // The ACTIVE KYC session, read only. Sent with each question so
   // "what's left for me?" is answered from real state. Never
   // ensureSession() — asking a question must not start a workflow.
@@ -97,6 +129,19 @@ export default function KnowledgePage() {
       behavior: "smooth",
     });
   }, [messages, typing]);
+
+  /*
+   * Un-stick a page that failed while the backend was still booting. Without
+   * this the "waking" state above could become a permanent loader: the probe
+   * would go warm and nothing would ever re-run boot(). Deps only change on a
+   * real transition, so a boot that fails while warm cannot loop.
+   */
+  React.useEffect(() => {
+    if (phase === "error" && backend.status === "warm") {
+      void boot();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, backend.status]);
 
   /* --- boot: fetch engine status ---------------------------------------- */
   const boot = React.useCallback(async () => {
@@ -257,8 +302,9 @@ React.useEffect(() => {
           id: nextId(),
           role: "assistant",
           at: now(),
-          content: `Sorry — I couldn't answer that (${apiError.message}).`,
-          confident: false,
+          content: knowledgeFailureText(apiError),
+          failed: true,
+          retryQuestion: content,
         },
       ]);
       toast.error("Question failed", { description: apiError.message });
@@ -272,7 +318,18 @@ React.useEffect(() => {
   }
 
   if (phase === "error") {
-    return (
+    /*
+     * A transient status failure used to replace the whole page with a
+     * terminal-looking error — which is what turned a Render spin-down into
+     * "Couldn't reach the knowledge engine". While the shared probe says the
+     * backend is still waking, say THAT instead of declaring the engine dead.
+     */
+    return backend.isWaking ? (
+      <LoadingAnimation
+        label="Waking up Sahayak — the free-tier server sleeps when idle. This can take up to a minute."
+        className="min-h-[50dvh]"
+      />
+    ) : (
       <ErrorState
         title="Couldn't reach the knowledge engine"
         description={bootError}
@@ -354,7 +411,26 @@ React.useEffect(() => {
               <ChatBubble key={message.id} role={message.role}>
                 <span className="whitespace-pre-line">{message.content}</span>
 
-                {message.role === "assistant" && message.confident === false && (
+                {message.role === "assistant" && message.failed && (
+                  <span className="mt-2 block space-x-2">
+                    <Badge variant="warning">
+                      Couldn&apos;t reach the knowledge engine
+                    </Badge>
+                    {message.retryQuestion && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void ask(message.retryQuestion)}
+                      >
+                        Try again
+                      </Button>
+                    )}
+                  </span>
+                )}
+
+                {message.role === "assistant" &&
+                  !message.failed &&
+                  message.confident === false && (
                   <span className="mt-2 block">
                     <Badge variant="warning">
                       <ShieldCheck aria-hidden /> Honest answer — not covered by the documents
