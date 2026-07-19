@@ -25,7 +25,7 @@ from app.infrastructure.intelligence import FileSystemSchemaSource
 from app.infrastructure.knowledge import (
     ChromaVectorStore,
     FileSystemCorpusLoader,
-    SentenceTransformerEmbedder,
+    OnnxEmbedder,
 )
 from app.infrastructure.ocr.pymupdf_inspector import PyMuPdfInspector
 from app.infrastructure.ocr.tesseract_ocr_provider import TesseractOCRProvider
@@ -149,9 +149,22 @@ _coordinate_mapper = CoordinateMapper(map_path=settings.PDF_COORDINATE_MAP_PATH)
 # Completely independent of the OCR/session/upload/PDF services above — the
 # knowledge engine shares only the AIService for answer phrasing.
 # --------------------------------------------------------------------------- #
+# Which embedding adapter is in play is decided HERE and nowhere else, so no
+# other module learns whether torch is loaded. See Settings.KNOWLEDGE_EMBEDDER
+# for why "onnx" is the default and why switching requires re-ingestion.
+if settings.KNOWLEDGE_EMBEDDER.strip().lower() in {"torch", "sentence-transformers"}:
+    # Imported HERE rather than at module scope: the import itself costs
+    # ~375 MB (torch + transformers + sklearn), so it must not happen when
+    # the ONNX adapter is selected.
+    from app.infrastructure.knowledge import SentenceTransformerEmbedder
+
+    _embedder_class = SentenceTransformerEmbedder
+else:
+    _embedder_class = OnnxEmbedder
+
 knowledge_service = KnowledgeService(
     loader=FileSystemCorpusLoader(),
-    embedder=SentenceTransformerEmbedder(model_name=settings.KNOWLEDGE_EMBEDDING_MODEL),
+    embedder=_embedder_class(model_name=settings.KNOWLEDGE_EMBEDDING_MODEL),
     store=ChromaVectorStore(
         db_path=settings.KNOWLEDGE_DB_DIR,
         collection_name=settings.KNOWLEDGE_COLLECTION,
@@ -160,7 +173,7 @@ knowledge_service = KnowledgeService(
     # Probed once here — the composition root is the only layer that may know
     # which concrete adapters (and therefore which libraries) are in play.
     dependencies_installed=(
-        SentenceTransformerEmbedder.dependencies_installed()
+        _embedder_class.dependencies_installed()
         and ChromaVectorStore.dependencies_installed()
     ),
 )

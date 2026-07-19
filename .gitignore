@@ -31,6 +31,9 @@ backend/generated_pdfs/
 # --- Logs (may contain request paths, ids and stack traces) ---
 *.log
 
+# --- Test/runtime scratch state (may embed real session and document ids) ---
+backend/_restart_state.json
+
 # --- Python ---
 __pycache__/
 *.py[cod]

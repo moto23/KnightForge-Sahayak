@@ -126,6 +126,20 @@ class Settings(BaseSettings):
     # user's own zone is never guessed — the answer names this one explicitly.
     APP_TIMEZONE: str = "Asia/Kolkata"
 
+    # Which EmbeddingProvider adapter backs Knowledge Chat retrieval.
+    #   "onnx"  -> OnnxEmbedder (all-MiniLM-L6-v2 on ONNX Runtime, ~215 MB)
+    #   "torch" -> SentenceTransformerEmbedder (bge-small-en-v1.5, ~512 MB)
+    #
+    # Defaults to "onnx" because the torch path costs ~300 MB more and pushed
+    # the backend to a measured 658 MB peak — above the 512 MB ceiling of the
+    # free hosting tier this deploys to. Retrieval quality was benchmarked
+    # across both before this default was chosen.
+    #
+    # NOTE: the two adapters produce vectors in DIFFERENT spaces. Changing
+    # this value REQUIRES re-ingesting the knowledge corpus; a mixed index
+    # returns meaningless neighbours.
+    KNOWLEDGE_EMBEDDER: str = "onnx"
+
     KNOWLEDGE_DOCS_DIR: str = "knowledge_docs"
     # On-disk home of the ChromaDB vector database (persists across restarts).
     KNOWLEDGE_DB_DIR: str = "knowledge_db"
@@ -144,9 +158,24 @@ class Settings(BaseSettings):
     # NOTE: similarity alone is a weak signal — bge cosine scores for totally
     # unrelated text can reach ~0.5 — so this floor is only the first layer
     # of the confidence gate (see KnowledgeService.query).
-    KNOWLEDGE_MIN_SIMILARITY: float = 0.35
+    # Calibrated for the ACTIVE embedding model (KNOWLEDGE_EMBEDDER).
+    # Cosine scores are not comparable across models, so these move together
+    # with the embedder. Measured on the KYC corpus:
+    #
+    #                    in-domain KYC      off-topic
+    #   bge-small           0.68 - 0.80     up to ~0.50 (per the note above)
+    #   all-MiniLM-L6-v2    0.31 - 0.61     0.00 - 0.16
+    #
+    # MiniLM compresses the scale but separates the two classes far more
+    # cleanly, so the floor sits between the highest off-topic score (0.154)
+    # and the lowest genuine KYC score (0.312) with margin on both sides.
+    # Leaving the bge value of 0.35 here would have silently refused real
+    # questions like "Do I need a photo on the SBI form?".
+    KNOWLEDGE_MIN_SIMILARITY: float = 0.25
     # Second gate layer: a retrieved context must either be VERY similar…
-    KNOWLEDGE_STRONG_SIMILARITY: float = 0.62
+    # Scaled with the floor above: 0.62 sat near the top of bge's range, and
+    # the equivalent point on MiniLM's compressed range is ~0.45.
+    KNOWLEDGE_STRONG_SIMILARITY: float = 0.45
     # …or share at least this fraction of the question's content terms
     # (lexical grounding). Below both -> honest "I don't know", no LLM call.
     KNOWLEDGE_MIN_TERM_OVERLAP: float = 0.25
