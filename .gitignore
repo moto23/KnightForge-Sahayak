@@ -1,0 +1,62 @@
+# KnightForge Sahayak — repository-wide ignores.
+#
+# This file is the LAST line of defence against committing applicant data.
+# Real user uploads, generated KYC PDFs and the runtime database were once
+# committed to this public repository and had to be scrubbed from history;
+# the rules below exist so that cannot happen a second time. The per-project
+# backend/.gitignore and frontend/.gitignore still apply — this file covers
+# the repository root, which previously had no rules at all.
+
+# --- Secrets: never commit a real environment file ---
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# --- Runtime databases (users, tokens, sessions, workflow state) ---
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# --- Applicant data produced at runtime ---
+# Uploaded PAN/Aadhaar/supporting documents, photos and signatures.
+backend/uploads/
+# Filled KYC forms generated for real applicants.
+backend/generated_pdfs/
+
+# --- Logs (may contain request paths, ids and stack traces) ---
+*.log
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# --- Node / Next.js ---
+node_modules/
+.next/
+out/
+.vercel
+
+# --- OS / IDE ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# --- Temporary ---
+*.tmp
+*.temp
