@@ -12,9 +12,8 @@ Built for **OpenAI Build Week 2026**.
 
 ## 🎬 Demo
 
-🌐 **Live Demo:** <YOUR_DEPLOYED_URL>
+🌐 **Live Demo:** <[(https://knight-forge-sahayak.vercel.app/)>
 
-▶️ **Demo Video:** <YOUR_DEMO_VIDEO_URL>
 
 ---
 
