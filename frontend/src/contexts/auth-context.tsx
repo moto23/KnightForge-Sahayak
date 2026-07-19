@@ -36,6 +36,28 @@ import type { UserProfile } from "@/types/api";
 /** Refresh this many minutes before the access token would expire. */
 const REFRESH_EARLY_MINUTES = 5;
 
+/**
+ * Ceiling for the two SILENT refreshes (boot restore + scheduled renewal).
+ *
+ * The API client's 20s default is tuned for calls a user is actively waiting
+ * on. It is wrong here for one specific reason: a free-tier backend sleeps
+ * when idle, and the first request after that wakes the container instead of
+ * being refused — it is queued and answered a cold start later, well past 20s.
+ *
+ * At 20s the client gave up on a request the server still went on to process,
+ * and a returning user with a perfectly valid cookie was silently demoted to
+ * guest. The obvious repair — retry — is the one thing we must NOT do: the
+ * backend rotates refresh tokens single-use and revokes ALL of a user's
+ * sessions when it sees one replayed, so a retry after an ambiguous timeout
+ * risks signing them out everywhere. Waiting longer on a single attempt is
+ * both the safer and the more honest option.
+ *
+ * This costs nothing on a warm backend (a ceiling is not a delay) and nothing
+ * for genuine guests (no cookie answers 401 immediately). Only a signed-in
+ * user meeting a cold start waits — and now waits for the right answer.
+ */
+const BACKGROUND_REFRESH_TIMEOUT_MS = 75_000;
+
 export type AuthContextValue = {
   /** null = guest (or still restoring). */
   user: UserProfile | null;
@@ -105,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const silentRefresh = React.useCallback(async (): Promise<boolean> => {
     try {
-      const session = await authService.refresh();
+      const session = await authService.refresh(BACKGROUND_REFRESH_TIMEOUT_MS);
       adoptSession(
         session.access_token,
         session.user,

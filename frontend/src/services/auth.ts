@@ -27,8 +27,21 @@ export const authService = {
     ),
   login: (email: string, password: string) =>
     api.post<AuthResponse>("/auth/login", { email, password }, withCookies),
-  /** Silent persistent login — succeeds only if the refresh cookie is valid. */
-  refresh: () => api.post<AuthResponse>("/auth/refresh", undefined, withCookies),
+  /**
+   * Silent persistent login — succeeds only if the refresh cookie is valid.
+   *
+   * `timeoutMs` exists because this call is NOT retryable: the backend rotates
+   * the refresh token and treats a replayed one as theft (it revokes every
+   * session of that user). Abandoning a request the server is still going to
+   * process would therefore cost the user far more than waiting for it, so the
+   * silent paths ride out a cold backend with a longer ceiling instead of
+   * giving up and retrying. See auth-context's BACKGROUND_REFRESH_TIMEOUT_MS.
+   */
+  refresh: (timeoutMs?: number) =>
+    api.post<AuthResponse>("/auth/refresh", undefined, {
+      ...withCookies,
+      ...(timeoutMs === undefined ? {} : { timeoutMs }),
+    }),
   logout: () => api.post<LogoutResponse>("/auth/logout", undefined, withCookies),
   logoutAll: () =>
     api.post<LogoutResponse>("/auth/logout-all", undefined, withCookies),

@@ -33,7 +33,7 @@ const MENU_ITEMS = [
  */
 export function ProfileMenu() {
   const router = useRouter();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, restoring, logout } = useAuth();
   const [open, setOpen] = React.useState(false);
   const [signingOut, setSigningOut] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -68,6 +68,24 @@ export function ProfileMenu() {
       setSigningOut(false);
     }
   };
+
+  /*
+   * "Restoring" is its own state, not a flavour of signed-out. Treating it as
+   * signed-out meant a returning user was shown "Sign in" for the length of
+   * the boot refresh — a cold backend stretches that from a blink into
+   * seconds — and then watched it flip to their avatar. Holding the slot with
+   * a neutral placeholder of the SAME size says "not known yet" without
+   * claiming they are a guest, and without shifting the topbar when the
+   * answer arrives.
+   */
+  if (restoring) {
+    return (
+      <div
+        aria-hidden
+        className="size-9 shrink-0 animate-pulse rounded-full bg-muted"
+      />
+    );
+  }
 
   if (!isAuthenticated || !user) {
     return (
