@@ -17,7 +17,7 @@ const FOOTER_COLUMNS = [
     links: [
       { label: "Dashboard", href: "/dashboard" },
       { label: "Upload", href: "/upload" },
-      { label: "AI Interview", href: "/interview" },
+      { label: "AI-Guided Completion", href: "/interview" },
       { label: "PDF Preview", href: "/preview" },
     ],
   },
@@ -66,7 +66,7 @@ export function Footer() {
             © 2026 KnightForge Sahayak. Built for the Codex Hackathon.
           </p>
           <p className="text-xs text-muted-foreground">
-            Documents are processed locally — nothing leaves your machine.
+            Your documents are processed on your own Sahayak backend.
           </p>
         </div>
       </div>

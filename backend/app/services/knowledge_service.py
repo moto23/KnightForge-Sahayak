@@ -53,22 +53,32 @@ from app.domain.knowledge import (
     VectorStore,
 )
 from app.services.ai_service import AIService, AIUnavailableError
+from app.services.knowledge_intent import (
+    QueryIntent,
+    classify_intent,
+    conversational_answer,
+    datetime_answer,
+)
 from app.services.prompts import build_knowledge_prompt
 
 logger = logging.getLogger(__name__)
 
 # The honest answer when retrieval can't ground a response. Never guessed past.
+# Scoped to the whole supported domain — not one form — so the user learns
+# what this assistant CAN answer.
 _IDK_ANSWER = (
-    "I don't know based on the current knowledge base. The official KYC "
-    "documents I have indexed don't cover this — try asking about the CVL "
-    "KYC form, accepted identity and address proofs, or the KRA process."
+    "I don't know based on the current KYC knowledge base. Sahayak focuses on "
+    "KYC forms, required documents, identity/address proofs, bank KYC, KRA "
+    "rules and using this platform. Try asking about CVL, SBI, HDFC, ICICI or "
+    "Axis KYC, PAN/Aadhaar, address proofs, required documents or the KYC "
+    "process."
 )
 
-# Extractive fallback header when OpenAI is unavailable (answers stay grounded
-# and cited — they're the retrieved passages verbatim).
+# Header for the grounded extractive answer used when generation is
+# unavailable. The user is never told the AI is "offline" — they get the
+# official wording, cited, which is a legitimate answer in its own right.
 _FALLBACK_HEADER = (
-    "AI answer generation is offline, so here are the most relevant passages "
-    "from the official documents:"
+    "Here's what the official KYC documents say about this:"
 )
 _FALLBACK_EXCERPT_CHARS = 350
 
@@ -163,8 +173,52 @@ class KnowledgeService:
     # Retrieval + grounded generation
     # ------------------------------------------------------------------ #
 
-    def query(self, question: str, top_k: int | None = None) -> KnowledgeAnswer:
+    def query(
+        self,
+        question: str,
+        top_k: int | None = None,
+        workflow_state: str | None = None,
+    ) -> KnowledgeAnswer:
         """Answer from retrieved context only — or say "I don't know" honestly."""
+        # Intent routing FIRST: greetings, "who are you?" and date questions
+        # have no answer in a KYC corpus, and clearly unrelated questions must
+        # never be answered from the model's general knowledge. Only genuine
+        # domain questions reach retrieval.
+        intent = classify_intent(question)
+        if intent is QueryIntent.CONVERSATIONAL:
+            return KnowledgeAnswer(
+                question=question,
+                answer=conversational_answer(question),
+                confident=True,
+                generator="sahayak-assistant",
+                citations=(),
+            )
+        if intent is QueryIntent.DATETIME:
+            return KnowledgeAnswer(
+                question=question,
+                answer=datetime_answer(question, self._config.APP_TIMEZONE),
+                confident=True,
+                generator="server-clock",
+                citations=(),
+            )
+        # A question about THIS applicant's own form is answered from the
+        # session, never from the corpus and never by the model: retrieval
+        # only knows official documents, and a generated guess about
+        # someone's progress would be an invented fact about their KYC.
+        if intent is QueryIntent.WORKFLOW:
+            return KnowledgeAnswer(
+                question=question,
+                answer=workflow_state or (
+                    "I can only answer that once you have a KYC form open. Upload or choose your primary form on the Upload page, and I will tell you exactly what is left."
+                ),
+                confident=workflow_state is not None,
+                generator="session-state",
+                citations=(),
+            )
+        if intent is QueryIntent.OUT_OF_DOMAIN:
+            logger.info("Knowledge query routed out-of-domain: %r", question)
+            return self._idk(question)
+
         self._require_dependencies()
         if self._store.chunk_count() == 0:
             raise KnowledgeIndexEmptyError()

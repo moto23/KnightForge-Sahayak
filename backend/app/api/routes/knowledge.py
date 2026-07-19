@@ -22,6 +22,17 @@ import logging
 from fastapi import APIRouter, Depends
 from starlette.concurrency import run_in_threadpool
 
+from app.core.exceptions import DomainError
+from app.core.rate_limit import knowledge_limiter, limit
+from app.infrastructure.db.models import User
+from app.services.interview_service import InterviewService
+from app.services.session_service import SessionService
+from app.services.workflow_state import describe_session_state
+from app.core.dependencies import (
+    get_interview_service,
+    get_optional_user,
+    get_session_service,
+)
 from app.core.dependencies import get_knowledge_service
 from app.schemas.knowledge import (
     KnowledgeIndexResponse,
@@ -38,6 +49,7 @@ router = APIRouter(prefix="/knowledge", tags=["Knowledge RAG"])
 
 @router.post(
     "/index",
+    dependencies=[Depends(limit(knowledge_limiter))],
     response_model=KnowledgeIndexResponse,
     summary="Build (or rebuild) the knowledge index",
     description=(
@@ -62,6 +74,7 @@ async def build_index(
 
 @router.post(
     "/query",
+    dependencies=[Depends(limit(knowledge_limiter))],
     response_model=KnowledgeQueryResponse,
     summary="Ask a question grounded in the indexed documents",
     description=(
@@ -79,9 +92,27 @@ async def build_index(
 async def query_knowledge(
     payload: KnowledgeQueryRequest,
     knowledge: KnowledgeService = Depends(get_knowledge_service),
+    sessions: SessionService = Depends(get_session_service),
+    interview: InterviewService = Depends(get_interview_service),
+    user: User | None = Depends(get_optional_user),
 ) -> KnowledgeQueryResponse:
+    # Read the caller's OWN session state, through the same ownership check
+    # every other session endpoint uses. A session that is not theirs (or
+    # not there) simply yields no state, and the engine says so honestly
+    # rather than guessing.
+    workflow_state: str | None = None
+    if payload.session_id:
+        try:
+            sessions.assert_owner(
+                payload.session_id, user.id if user else None
+            )
+            workflow_state = describe_session_state(
+                payload.session_id, sessions, interview
+            )
+        except DomainError:
+            workflow_state = None
     answer = await run_in_threadpool(
-        knowledge.query, payload.question, payload.top_k
+        knowledge.query, payload.question, payload.top_k, workflow_state
     )
     return KnowledgeQueryResponse.from_answer(answer)
 

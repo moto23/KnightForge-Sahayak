@@ -84,6 +84,10 @@ class InterviewService:
             next_question=self._current_question(session),
         )
 
+    def skip_field(self, session_id: str, field_id: str):
+        """Record a declined OPTIONAL field and recompute; see SessionService."""
+        return self._sessions.skip_field(session_id, field_id)
+
     def next_question(self, session_id: str) -> tuple[Session, KYCField | None]:
         """Return the next field to ask (full metadata), or None when done."""
         session = self._sessions.get_session(session_id)
@@ -93,8 +97,20 @@ class InterviewService:
         """Compute the full progress report for a session, schema-driven."""
         session = self._sessions.get_session(session_id)
         all_fields = self._forms.get_all_fields()
-        required = self._forms.get_required_fields()
-        pending_required = self._next_engine.remaining_required_fields(session.answers)
+        # Progress is measured against the ACTIVE primary form's requirements
+        # when one was selected (Phase 13), else the registry's own set.
+        # `is not None`: an empty scope means the primary form was retired, so
+        # there is genuinely no questionnaire — 0 required fields, not the
+        # registry's default list.
+        scope = session.required_field_ids
+        required = (
+            tuple(f for f in all_fields if f.id in set(scope))
+            if scope is not None
+            else self._forms.get_required_fields()
+        )
+        pending_required = self._next_engine.remaining_required_fields(
+            session.answers, scope
+        )
 
         return ProgressReport(
             session_id=session.session_id,
@@ -118,7 +134,9 @@ class InterviewService:
         the missing fields if anything required is still unanswered.
         """
         session = self._sessions.get_session(session_id)
-        remaining = self._next_engine.remaining_required_fields(session.answers)
+        remaining = self._next_engine.remaining_required_fields(
+            session.answers, session.required_field_ids
+        )
         if remaining:
             raise InterviewIncompleteError(tuple(f.id for f in remaining))
         logger.info("Interview complete for session %s", session.session_id)

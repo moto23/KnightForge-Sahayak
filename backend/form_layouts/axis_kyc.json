@@ -1,0 +1,132 @@
+{
+  "form_id": "axis_kyc",
+  "label": "Axis Bank KYC Application Form (Central KYC Registry)",
+  "has_text_layer": true,
+  "excluded_widget_patterns": [
+    "branch",
+    "employee",
+    "emp_",
+    "official",
+    "joint",
+    "verification",
+    "acknowle"
+  ],
+  "excluded_regions": [
+    [0, { "x0": 0, "y0": 336, "x1": 598, "y1": 860 }],
+    [1, { "x0": 0, "y0": 0, "x1": 598, "y1": 860 }]
+  ],
+  "layout_guards": [
+    {
+      "anchor": "1st Joint Applicant",
+      "page": 0,
+      "min_y": 336.0,
+      "max_y": 344.0
+    },
+    {
+      "anchor": "Primary Applicant",
+      "page": 0,
+      "min_y": 82.0,
+      "max_y": 92.0
+    }
+  ],
+  "fields": {
+    "full_name": {
+      "page": 0,
+      "name_segments": {
+        "cells": 12,
+        "first": { "x0": 155.8, "y0": 108.0, "x1": 288.3, "y1": 122.4 },
+        "middle": { "x0": 299.4, "y0": 108.0, "x1": 432.0, "y1": 122.4 },
+        "last": { "x0": 443.0, "y0": 108.0, "x1": 575.6, "y1": 122.4 }
+      }
+    },
+    "father_spouse_name": {
+      "page": 0,
+      "name_segments": {
+        "cells": 12,
+        "first": { "x0": 155.8, "y0": 142.5, "x1": 288.3, "y1": 157.0 },
+        "middle": { "x0": 299.4, "y0": 142.5, "x1": 432.0, "y1": 157.0 },
+        "last": { "x0": 443.0, "y0": 142.5, "x1": 575.6, "y1": 157.0 }
+      }
+    },
+    "mother_name": {
+      "page": 0,
+      "name_segments": {
+        "cells": 12,
+        "first": { "x0": 155.8, "y0": 159.8, "x1": 288.3, "y1": 174.3 },
+        "middle": { "x0": 299.4, "y0": 159.8, "x1": 432.0, "y1": 174.3 },
+        "last": { "x0": 443.0, "y0": 159.8, "x1": 575.6, "y1": 174.3 }
+      }
+    },
+    "spouse_name": {
+      "page": 0,
+      "name_segments": {
+        "cells": 12,
+        "first": { "x0": 155.8, "y0": 177.0, "x1": 288.3, "y1": 191.4 },
+        "middle": { "x0": 299.4, "y0": 177.0, "x1": 432.0, "y1": 191.4 },
+        "last": { "x0": 443.0, "y0": 177.0, "x1": 575.6, "y1": 191.4 }
+      }
+    },
+    "occupation": {
+      "page": 0,
+      "mode": "check",
+      "option_rects": {
+        "private_sector": { "x0": 113.6, "y0": 228.8, "x1": 122.0, "y1": 237.3 },
+        "public_sector": { "x0": 187.1, "y0": 228.8, "x1": 195.6, "y1": 237.3 },
+        "government_service": { "x0": 258.4, "y0": 228.8, "x1": 266.8, "y1": 237.3 },
+        "business": { "x0": 351.1, "y0": 228.8, "x1": 359.5, "y1": 237.3 },
+        "professional": { "x0": 408.1, "y0": 228.8, "x1": 416.5, "y1": 237.3 },
+        "retired": { "x0": 187.1, "y0": 242.9, "x1": 195.6, "y1": 251.4 },
+        "housewife": { "x0": 258.4, "y0": 242.9, "x1": 266.8, "y1": 251.4 },
+        "student": { "x0": 351.1, "y0": 242.9, "x1": 359.5, "y1": 251.4 }
+      }
+    },
+    "declaration_date": {
+      "page": 0,
+      "mode": "comb",
+      "cells": 8,
+      "rect": { "x0": 61.1, "y0": 319.1, "x1": 155.2, "y1": 333.5 }
+    },
+    "declaration_place": {
+      "page": 0,
+      "rect": { "x0": 185.0, "y0": 319.5, "x1": 328.0, "y1": 331.5 }
+    }
+  },
+  "signature": {
+    "page": 0,
+    "rect": { "x0": 427.0, "y0": 300.1, "x1": 579.7, "y1": 333.5 }
+  },
+  "not_on_form": [
+    "date_of_birth",
+    "gender",
+    "marital_status",
+    "nationality",
+    "nationality_other",
+    "residential_status",
+    "pan",
+    "aadhaar",
+    "poi_document",
+    "poa_document",
+    "correspondence_address",
+    "city",
+    "state",
+    "pincode",
+    "country",
+    "mobile",
+    "email",
+    "telephone_office",
+    "telephone_residence",
+    "permanent_address",
+    "permanent_pincode",
+    "gross_annual_income",
+    "net_worth",
+    "net_worth_date",
+    "is_pep",
+    "is_pep_related",
+    "other_information",
+    "account_number",
+    "ckycr_number",
+    "religion",
+    "category",
+    "monthly_income"
+  ]
+}

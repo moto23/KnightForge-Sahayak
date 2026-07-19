@@ -18,9 +18,9 @@ import { fadeUp, staggerContainer, viewportOnce } from "@/lib/motion";
 const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
   {
     icon: FileSearch,
-    title: "Intelligent document reading",
+    title: "Detects and reads any of your documents",
     description:
-      "OCR with confidence scoring — only high-confidence, valid values are prefilled; anything uncertain becomes a question.",
+      "Drop in several at once. Sahayak works out what each one is — PAN, Aadhaar, passport, bank statement and more — and merges what it reads into a single profile.",
   },
   {
     icon: Bot,
@@ -36,15 +36,15 @@ const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
   },
   {
     icon: MapPin,
-    title: "Pixel-perfect PDF output",
+    title: "Your own form, completed",
     description:
-      "Answers land exactly in the official form's boxes — comb fields, checkboxes, date segments and all.",
+      "Answers are written onto a copy of the form you uploaded — text fields, checkboxes and date boxes — leaving the original untouched.",
   },
   {
     icon: Wand2,
     title: "Smart prefill, honest gaps",
     description:
-      "What the AI can't verify it never guesses. You always review before anything reaches the final document.",
+      "Every value shows which document it came from. What can't be verified is flagged rather than filled in, and you review before anything reaches your form.",
   },
   {
     icon: Languages,

@@ -13,6 +13,7 @@ from abc import ABC, abstractmethod
 from app.domain.conversation import ConversationTurn
 from app.domain.document import UploadedDocument
 from app.domain.enums import DocumentCategory
+from app.domain.form_assets import AssetKind, SessionAsset
 from app.domain.extraction import (
     DocumentUnderstanding,
     ImageFacts,
@@ -248,3 +249,29 @@ class GeneratedPdfRepository(ABC):
     @abstractmethod
     def delete(self, pdf_id: str) -> bool:
         """Remove a record; return True if it existed."""
+
+
+class SessionAssetRepository(ABC):
+    """
+    Persistence contract for a session's photograph/signature METADATA.
+
+    Bytes live behind FileStorage exactly like uploaded documents; only the
+    record lives here. A session holds at most ONE asset per kind, so a second
+    upload of the same kind REPLACES the first rather than accumulating.
+    """
+
+    @abstractmethod
+    def get(self, session_id: str, kind: "AssetKind") -> "SessionAsset | None":
+        """The session's asset of this kind, or None if it has none."""
+
+    @abstractmethod
+    def save(self, asset: "SessionAsset") -> None:
+        """Store (or replace) the asset for its session and kind."""
+
+    @abstractmethod
+    def delete(self, session_id: str, kind: "AssetKind") -> "SessionAsset | None":
+        """Remove the asset; return the removed record, or None if absent."""
+
+    @abstractmethod
+    def list_for_session(self, session_id: str) -> "tuple[SessionAsset, ...]":
+        """Every asset this session holds (0-2 records)."""

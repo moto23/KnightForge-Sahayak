@@ -40,6 +40,7 @@ _VALIDATORS: dict[ValidationType, Validator] = {
     ValidationType.DOB: rules.validate_dob,
     ValidationType.NAME: rules.validate_name,
     ValidationType.NUMBER: rules.validate_number,
+    ValidationType.PLACE: rules.validate_place,
 }
 
 # Boolean fields accept these canonical string values.
@@ -82,12 +83,22 @@ class ValidationEngine:
             allowed = {o.value.lower() for o in field.options} | {
                 o.label.lower() for o in field.options
             }
-            if raw.lower() not in allowed:
-                choices = ", ".join(o.label for o in field.options)
-                return ValidationResult.fail(
-                    "invalid_option",
-                    f"'{raw}' is not a valid choice for {field.display_name}. Options: {choices}.",
-                )
+            # MULTI_CHOICE holds SEVERAL options in one answer, stored
+            # comma-separated. Each part is checked on its own so a single bad
+            # entry names itself instead of failing the whole answer opaquely.
+            parts = (
+                [p.strip() for p in raw.split(",") if p.strip()]
+                if field.field_type == FieldType.MULTI_CHOICE
+                else [raw]
+            )
+            for part in parts:
+                if part.lower() not in allowed:
+                    choices = ", ".join(o.label for o in field.options)
+                    return ValidationResult.fail(
+                        "invalid_option",
+                        f"'{part}' is not a valid choice for {field.display_name}. "
+                        f"Options: {choices}.",
+                    )
 
         # 3. Boolean fields: accept canonical yes/no/true/false.
         if field.field_type == FieldType.BOOLEAN and raw.lower() not in _BOOLEAN_VALUES:

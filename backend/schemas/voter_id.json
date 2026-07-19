@@ -3,18 +3,26 @@
   "label": "Voter ID Card",
   "kind": "identity_document",
   "markers": {
-    "strong": ["election commission of india", "elector photo identity card"],
-    "weak": ["elector", "epic", "identity card", "assembly constituency", "elector's name"],
+    "strong": ["election commission of india", "elector photo identity card", "voter id card"],
+    "weak": ["elector", "epic", "identity card", "assembly constituency", "elector's name", "part no", "serial no", "polling station", "electoral roll", "voter"],
+    "patterns": ["\\b[A-Z]{3}[0-9]{7}\\b"],
     "min_score": 3
   },
   "fields": [
-    {"canonical": "name", "labels": ["elector's name", "electors name", "name"]},
-    {"canonical": "father_name", "labels": ["father's name", "fathers name", "relation's name", "relations name", "husband's name"]},
+    {"canonical": "name", "labels": ["elector's name", "electors name", "name of elector", "name"]},
+    {"canonical": "father_name", "labels": ["father's name", "fathers name", "relation's name", "relations name", "husband's name", "mother's name", "relative name", "guardian's name"]},
     {"canonical": "gender", "labels": ["sex", "gender"], "document_wide": true},
     {"canonical": "dob", "labels": ["date of birth", "dob"]},
-    {"canonical": "address", "labels": ["address"]},
-    {"canonical": "pincode", "labels": ["pin code", "pincode"]},
-    {"extra_key": "epic_number", "extra_label": "EPIC Number", "labels": ["epic no", "epic number"], "value_kind": "epic", "document_wide": true},
-    {"extra_key": "assembly_constituency", "extra_label": "Assembly Constituency", "labels": ["assembly constituency"]}
+    {"canonical": "address", "labels": ["address", "residential address"]},
+    {"canonical": "city", "labels": ["city", "town", "village"]},
+    {"canonical": "state", "labels": ["state"]},
+    {"canonical": "pincode", "labels": ["pin code", "pincode"], "document_wide": true},
+    {"extra_key": "epic_number", "extra_label": "EPIC Number", "labels": ["epic no", "epic number", "identity card no", "card no"], "value_kind": "epic", "document_wide": true},
+    {"extra_key": "assembly_constituency", "extra_label": "Assembly Constituency", "labels": ["assembly constituency", "constituency"]},
+    {"extra_key": "age", "extra_label": "Age", "labels": ["age", "age as on"], "value_kind": "count"},
+    {"extra_key": "part_number", "extra_label": "Part Number", "labels": ["part no", "part number"]},
+    {"extra_key": "serial_number", "extra_label": "Serial Number", "labels": ["serial no", "sl no", "s. no"]},
+    {"extra_key": "polling_station", "extra_label": "Polling Station", "labels": ["polling station"]},
+    {"extra_key": "issue_date", "extra_label": "Date of Issue", "labels": ["date of issue", "issue date"], "value_kind": "date"}
   ]
 }

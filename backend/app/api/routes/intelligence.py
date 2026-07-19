@@ -17,10 +17,17 @@ import logging
 
 from fastapi import APIRouter, Depends
 
+from app.core.rate_limit import ai_limiter, limit
 from app.core.dependencies import (
+    assert_document_access,
+    owned_session,
     get_document_intelligence_service,
+    get_optional_user,
+    get_session_service,
     get_upload_history_service,
 )
+from app.infrastructure.db.models import User
+from app.services.session_service import SessionService
 from app.schemas.intelligence import (
     ConflictResolveRequest,
     IntelligenceProcessRequest,
@@ -38,6 +45,7 @@ router = APIRouter(prefix="/intelligence", tags=["Universal Document Intelligenc
 
 @router.post(
     "/process",
+    dependencies=[Depends(limit(ai_limiter))],
     response_model=IntelligenceProcessResponse,
     summary="Classify a document and merge it into the session's unified profile",
     description=(
@@ -58,9 +66,24 @@ async def process_document(
     body: IntelligenceProcessRequest,
     service: DocumentIntelligenceService = Depends(get_document_intelligence_service),
     history: UploadHistoryService = Depends(get_upload_history_service),
+    sessions: SessionService = Depends(get_session_service),
+    user: User | None = Depends(get_optional_user),
 ) -> IntelligenceProcessResponse:
     """Process one document through the universal pipeline (idempotent)."""
-    report = service.process_document(body.document_id, body.session_id)
+    # The session travels in the BODY, so the path-based guard cannot reach it.
+    # Checked BEFORE any processing: this call writes extracted values into the
+    # session, so an unauthorised one would mutate another applicant's KYC data,
+    # not merely read it.
+    sessions.assert_owner(body.session_id, user.id if user else None)
+    # Owning the target session is not enough: the DOCUMENT is separate
+    # evidence, and without this a user could pull another applicant's PAN
+    # card or Aadhaar into their own session and read the extracted values
+    # back out of their own profile. Checked before any processing, so a
+    # refused call leaves the session and profile completely unchanged.
+    assert_document_access(body.document_id, user.id if user else None)
+    report = service.process_document(
+        body.document_id, body.session_id, is_primary=body.is_primary
+    )
     response = IntelligenceProcessResponse.from_report(report)
     try:
         # Phase 13 journal: record the AI-detected type + mark as processed.
@@ -85,7 +108,7 @@ async def process_document(
     responses={404: {"description": "Session not found."}},
 )
 async def get_profile(
-    session_id: str,
+    session_id: str = Depends(owned_session),
     service: DocumentIntelligenceService = Depends(get_document_intelligence_service),
 ) -> UnifiedProfileResponse:
     """Return the re-synced unified profile for a session."""
@@ -95,6 +118,7 @@ async def get_profile(
 
 @router.post(
     "/primary-form",
+    dependencies=[Depends(limit(ai_limiter))],
     response_model=UnifiedProfileResponse,
     summary="Select the session's PRIMARY form (the final output)",
     description=(
@@ -110,14 +134,18 @@ async def get_profile(
 async def set_primary_form(
     body: PrimaryFormRequest,
     service: DocumentIntelligenceService = Depends(get_document_intelligence_service),
+    sessions: SessionService = Depends(get_session_service),
+    user: User | None = Depends(get_optional_user),
 ) -> UnifiedProfileResponse:
     """Store the primary-form choice and return the re-synced profile."""
+    sessions.assert_owner(body.session_id, user.id if user else None)
     report = service.set_primary_form(body.session_id, body.form_id)
     return UnifiedProfileResponse.from_report(report)
 
 
 @router.post(
     "/resolve",
+    dependencies=[Depends(limit(ai_limiter))],
     response_model=UnifiedProfileResponse,
     summary="Resolve a field conflict by choosing the correct value",
     description=(
@@ -135,8 +163,15 @@ async def set_primary_form(
 async def resolve_conflict(
     body: ConflictResolveRequest,
     service: DocumentIntelligenceService = Depends(get_document_intelligence_service),
+    sessions: SessionService = Depends(get_session_service),
+    user: User | None = Depends(get_optional_user),
 ) -> UnifiedProfileResponse:
     """Record a conflict resolution and return the updated profile."""
+    sessions.assert_owner(body.session_id, user.id if user else None)
+    # document_id is optional here — it names the source whose value wins — but
+    # when supplied it must be one the caller may actually see.
+    if body.document_id:
+        assert_document_access(body.document_id, user.id if user else None)
     report = service.resolve_conflict(
         body.session_id, body.canonical_id, body.document_id, body.value
     )

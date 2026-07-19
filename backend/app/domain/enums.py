@@ -27,6 +27,7 @@ class FieldType(str, Enum):
     SINGLE_CHOICE = "single_choice"  # pick exactly one option (gender, income band)
     MULTI_CHOICE = "multi_choice"    # pick one or more options (proof documents)
     BOOLEAN = "boolean"        # yes/no or a single tick (PEP declaration)
+    ASSET = "asset"            # an uploaded image (photograph, signature)
 
 
 class ValidationType(str, Enum):
@@ -47,6 +48,7 @@ class ValidationType(str, Enum):
     DOB = "dob"                # date of birth: valid date, past, realistic age
     NAME = "name"              # non-empty alphabetic name
     NUMBER = "number"          # non-negative numeric amount
+    PLACE = "place"            # a town/city name — rejects yes/no and the like
 
 
 class SectionType(str, Enum):

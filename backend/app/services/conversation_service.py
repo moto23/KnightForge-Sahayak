@@ -158,6 +158,47 @@ _FB_NO_ANSWER = {
 _YES_WORDS = {"yes", "y", "haan", "han", "ha", "ji", "yes.", "haa", "हाँ", "हां", "जी"}
 _NO_WORDS = {"no", "n", "nahi", "nahin", "na", "no.", "नहीं", "ना"}
 
+# Ways people decline a question they cannot answer. Matched only when the
+# CURRENT field is optional; a required field is never skipped by phrasing.
+_SKIP_PHRASES = (
+    "skip", "skip this", "skip it", "yes skip", "yes, skip", "please skip",
+    "next", "next question", "pass", "leave it", "leave blank", "blank",
+    "dont know", "don't know", "do not know", "no idea", "not sure",
+    "not available", "na", "n/a", "none", "nothing", "i dont have",
+    "i don't have", "dont have", "don't have", "not have", "no ckyc",
+    "later", "maybe later", "cant remember", "can't remember",
+    "pata nahi", "nahi hai", "nahi pata",
+)
+
+
+def _reads_as_skip(message: str) -> bool:
+    """
+    True when a reply is a refusal to answer rather than an answer.
+
+    Matched on WHOLE WORDS against a short message. Substring matching was
+    tried first and was wrong in a way that loses real data: "skipper street"
+    contains "skip", so a genuine address would have been thrown away as a
+    refusal. The length ceiling keeps "skip" a refusal while letting a longer
+    sentence that merely mentions one be treated as an answer.
+    """
+    text = re.sub(r"[^a-z0-9\s'/]", " ", message.strip().lower())
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        return False
+    if text in _SKIP_PHRASES:
+        return True
+    for phrase in _SKIP_PHRASES:
+        if len(phrase) <= 3:
+            continue  # "na", "n/a" only count as the WHOLE message, above
+        # Whole-word/phrase hit, in a message short enough to be a refusal
+        # rather than a value that happens to contain the word.
+        if len(text) <= len(phrase) + 12 and re.search(
+            rf"(?<!\w){re.escape(phrase)}(?!\w)", text
+        ):
+            return True
+    return False
+
+
 # Validation types whose values never contain meaningful spaces/dashes.
 _COMPACT_TYPES = {
     ValidationType.PAN,
@@ -358,6 +399,26 @@ class ConversationService:
                 accepted=None, validation=None, next_question=None,
             )
 
+        # A refusal is not an answer. Without this the value ('skip') either
+        # failed validation and the same question came straight back, or was
+        # stored as if it were the applicant's CKYC number.
+        if not current.required and _reads_as_skip(message):
+            session = self._interview.skip_field(session_id, current.id)
+            following = self._interview.next_question(session_id)[1]
+            if following is None:
+                summary = self.summarize_progress(session_id, language)
+                reply_text, ai_generated = summary.message, summary.ai_generated
+            else:
+                reply_text, ai_generated = self._phrase_question(
+                    session, following, language
+                )
+            self._remember(session_id, TurnRole.ASSISTANT, reply_text)
+            return ConversationReply(
+                session=session, message=reply_text, ai_generated=ai_generated,
+                intent="skip", extraction=None, accepted=None, validation=None,
+                next_question=following,
+            )
+
         extraction = self.extract_answer(session_id, message, None, language)
 
         if extraction.intent == "question":
@@ -506,6 +567,22 @@ class ConversationService:
                 value = "yes"
             elif lowered in _NO_WORDS:
                 value = "no"
+        elif field.field_type == FieldType.MULTI_CHOICE and field.options:
+            # "Salary and pension" -> "salary, pension". Longest labels first so
+            # "Business Income" is not consumed by a bare "Income" match, and
+            # only options the user actually named are recorded — never all of
+            # them, and never a default.
+            lowered = value.lower()
+            chosen = [
+                option.value
+                for option in sorted(
+                    field.options, key=lambda o: len(o.label), reverse=True
+                )
+                if option.label.lower() in lowered or option.value.lower() in lowered
+            ]
+            if chosen:
+                order = [o.value for o in field.options]
+                value = ", ".join(sorted(set(chosen), key=order.index))
         elif field.options:
             lowered = value.lower()
             for option in field.options:

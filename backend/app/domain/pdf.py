@@ -16,6 +16,7 @@ ever becomes an OverlayPlan — OCR results never reach this module.
 Pure domain: no I/O, no framework imports.
 """
 
+import hashlib
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -78,3 +79,25 @@ class GeneratedPdf(BaseModel):
     generated_at: datetime = Field(
         default_factory=utc_now, description="When the PDF was produced (UTC)."
     )
+    answers_fingerprint: str = Field(
+        default="",
+        description=(
+            "Digest of the exact answers this PDF was rendered from (Phase "
+            "14). The record itself stays immutable — history is never "
+            "rewritten — but comparing this against the session's CURRENT "
+            "answers tells the UI whether the file still reflects the "
+            "workflow or has gone stale because a document was deleted or an "
+            "answer changed."
+        ),
+    )
+
+
+def fingerprint_answers(answers: dict[str, str]) -> str:
+    """
+    Stable digest of a session's answers — order-independent, so re-answering
+    the same values in a different order does NOT mark a PDF stale.
+    """
+    payload = "|".join(
+        f"{key}={(answers.get(key) or '').strip()}" for key in sorted(answers)
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:32]

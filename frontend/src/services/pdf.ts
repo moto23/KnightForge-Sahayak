@@ -20,8 +20,16 @@ export const pdfService = {
       { session_id: sessionId },
       { timeoutMs: 60_000 }, // template render + overlay can take a moment
     ),
-  list: (signal?: AbortSignal) =>
-    api.get<GeneratedPdfResponse[]>("/pdf", { signal }),
+  /**
+   * The immutable PDF history, newest first. Passing `sessionId` marks the
+   * record that still matches that session's current answers (`is_current`);
+   * everything else is history and stays downloadable.
+   */
+  list: (sessionId?: string | null, signal?: AbortSignal) =>
+    api.get<GeneratedPdfResponse[]>(
+      sessionId ? `/pdf?session_id=${encodeURIComponent(sessionId)}` : "/pdf",
+      { signal },
+    ),
   get: (pdfId: string) => api.get<GeneratedPdfResponse>(`/pdf/${pdfId}`),
   remove: (pdfId: string) => api.delete<DeletePdfResponse>(`/pdf/${pdfId}`),
 };

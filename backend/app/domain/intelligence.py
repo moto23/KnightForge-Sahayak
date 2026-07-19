@@ -23,6 +23,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.domain.enums import ExtractionMethod, ExtractionSource
+from app.domain.form_assets import FormAssetRequirements
 from app.domain.session import utc_now
 
 # --------------------------------------------------------------------------- #
@@ -112,6 +113,21 @@ class SchemaMarkers(BaseModel):
     )
 
 
+class SchemaConditionalRule(BaseModel):
+    """A form's declaration that one field matters only in certain states."""
+
+    model_config = ConfigDict(frozen=True)
+
+    field_id: str = Field(..., description="Interview field this rule can require.")
+    when_field: str = Field(..., description="Interview field whose state is read.")
+    equals: tuple[str, ...] = Field(
+        default=(), description="Values of when_field that trigger the requirement."
+    )
+    unless_answered: bool = Field(
+        default=False, description="Require only while when_field is unanswered."
+    )
+
+
 class DocumentSchema(BaseModel):
     """One supported document type — the unit the whole pipeline is driven by."""
 
@@ -127,6 +143,62 @@ class DocumentSchema(BaseModel):
     )
     fields: tuple[SchemaFieldRule, ...] = Field(
         default=(), description="Label -> canonical field mapping rules."
+    )
+    required_canonical: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "Canonical field ids THIS form marks mandatory (Phase 13). When "
+            "the form is chosen as the session's primary form, this set drives "
+            "progress, completion and which questions the interview asks — so "
+            "each bank's form is measured against its own requirements. Empty "
+            "= fall back to the interview registry's default required set."
+        ),
+    )
+    conditional_required: tuple["SchemaConditionalRule", ...] = Field(
+        default=(),
+        description=(
+            "Fields this form requires only in certain states (Phase 14) — "
+            "PAN-exempt proof of identity, 'other' free-text companions. Data "
+            "only, so an unseen form declares its own conditions in JSON."
+        ),
+    )
+    required_session_fields: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "Interview field ids this form requires that have NO canonical "
+            "home (marital status, residential status, PEP…). Unioned with "
+            "required_canonical so form-specific mandatory fields are still "
+            "asked, counted and printed."
+        ),
+    )
+    never_prefill: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "Canonical field ids that must ALWAYS be asked rather than "
+            "auto-filled from this form, however confidently they extract.\n\n"
+            "Some values read cleanly and are still wrong, because the label "
+            "the extractor anchors on belongs to something else on the page. "
+            "SBI's letterhead says 'STATE BANK OF INDIA', so 'State' captured "
+            "'BANK OF INDIA'; its office-use block yielded a bank-internal "
+            "address as the customer's email. Both passed validation, so no "
+            "confidence threshold could catch them - the only safe answer is "
+            "to ask the person. The value is still EXTRACTED and shown in the "
+            "profile as evidence; it simply never becomes an answer by itself."
+        ),
+    )
+    requires_photo: bool = Field(
+        default=False,
+        description=(
+            "This form prints a photograph box. A DECLARATION, not a detection: "
+            "used when the user only SELECTED the form (nothing to inspect) and "
+            "as a floor when the uploaded PDF is scanned/flat and the caption "
+            "could not be located. False here never suppresses a photo box that "
+            "was actually found in the document."
+        ),
+    )
+    requires_signature: bool = Field(
+        default=False,
+        description="This form prints a signature line. Same semantics as requires_photo.",
     )
 
 
@@ -293,6 +365,15 @@ class ProfileState(BaseModel):
     primary_form_label: str | None = Field(
         default=None, description="Display label of the selected primary form."
     )
+    primary_document_id: str | None = Field(
+        default=None,
+        description=(
+            "The uploaded document that IS the primary form (Phase 13). When "
+            "set, the completed PDF is produced by filling THIS file, so the "
+            "user gets their own SBI/HDFC/ICICI/Axis form back rather than a "
+            "recreated CVL page. None = fall back to the bundled template."
+        ),
+    )
     documents: dict[str, DocumentProfile] = Field(
         default_factory=dict, description="Processed documents keyed by document_id."
     )
@@ -302,6 +383,16 @@ class ProfileState(BaseModel):
     applied: dict[str, AppliedAnswer] = Field(
         default_factory=dict,
         description="canonical_id -> session answer this pipeline wrote.",
+    )
+    asset_requirements: "FormAssetRequirements | None" = Field(
+        default=None,
+        description=(
+            "Whether the ACTIVE primary form needs a photograph/signature, and "
+            "where each belongs on the page. Recomputed whenever the primary "
+            "form changes and cleared when it is deleted, so a form without a "
+            "photo box never leaves a stale 'photo pending' behind. None = no "
+            "primary form active, therefore no asset is ever asked for."
+        ),
     )
     updated_at: datetime = Field(default_factory=utc_now, description="Last mutation (UTC).")
 

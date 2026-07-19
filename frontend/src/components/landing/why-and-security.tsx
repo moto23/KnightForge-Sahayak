@@ -14,11 +14,16 @@ import { SectionShell } from "@/components/landing/section-shell";
 import { Card, GlassCard } from "@/components/ui/card";
 import { fadeUp, staggerContainer, viewportOnce } from "@/lib/motion";
 
+/**
+ * Every figure here must be verifiable from the shipped product — a demo is
+ * not the place for invented metrics. Counts match the installed form and
+ * document schemas; the qualitative ones describe behaviour you can observe.
+ */
 const STATS = [
-  { value: "21", label: "required fields handled for you" },
-  { value: "70%+", label: "typically prefilled from one scan" },
-  { value: "11", label: "deterministic validation rules" },
-  { value: "<1 min", label: "from last answer to filled PDF" },
+  { value: "5", label: "KYC forms supported as your primary form" },
+  { value: "9+", label: "supporting document types detected automatically" },
+  { value: "Per form", label: "required fields — not one fixed checklist" },
+  { value: "Cited", label: "every knowledge answer links to its source" },
 ];
 
 export function WhySahayak() {
@@ -26,7 +31,7 @@ export function WhySahayak() {
     <SectionShell
       eyebrow="Why KnightForge Sahayak"
       title="Forms are hostile. Your copilot isn't."
-      description="KYC rejections usually come from tiny mistakes — a malformed PAN, a missed checkbox, a wrong date format. Sahayak makes those mistakes impossible."
+      description="KYC rejections usually come from small mistakes — a malformed PAN, a missed checkbox, a date in the wrong format. Sahayak checks each one as you go and asks when it isn't sure."
     >
       <motion.div
         variants={staggerContainer}
@@ -50,36 +55,49 @@ export function WhySahayak() {
   );
 }
 
+/**
+ * Only claims the current architecture can actually stand behind. Sahayak
+ * runs on a backend you deploy, and when AI assistance is enabled the
+ * EXTRACTED TEXT is sent to Google Gemini — so "nothing ever leaves your
+ * machine" would be untrue. Saying so plainly is worth more than a
+ * comfortable promise.
+ */
 const SECURITY_POINTS = [
   {
     icon: HardDrive,
-    title: "Local-first processing",
-    description: "OCR and PDF generation run on your machine — documents never leave it.",
+    title: "Runs on your own backend",
+    description:
+      "Uploads, OCR, validation and PDF generation happen on the Sahayak server you deploy — not a third-party document service.",
+  },
+  {
+    icon: ServerOff,
+    title: "AI sees text, never your files",
+    description:
+      "With AI enabled, only extracted text is sent to Google Gemini for reading and answering. Your original scans stay on your backend.",
+  },
+  {
+    icon: TimerReset,
+    title: "Works without AI too",
+    description:
+      "No AI key configured? Extraction falls back to deterministic schema matching and the workflow keeps running end to end.",
   },
   {
     icon: EyeOff,
     title: "No silent guessing",
-    description: "Low-confidence extractions are asked, not assumed. You approve every value.",
+    description:
+      "Values that fail validation are shown and flagged rather than filled in. Conflicting documents ask you to choose.",
   },
   {
     icon: ShieldCheck,
     title: "Deterministic checks",
-    description: "Validation is code — Aadhaar checksums and PAN formats can't be hallucinated.",
-  },
-  {
-    icon: ServerOff,
-    title: "No tracking, no ads",
-    description: "There is no analytics pixel watching you fill in your PAN number.",
+    description:
+      "PAN format, Aadhaar checksum, IFSC, PIN and dates are verified in code — rules an AI cannot talk its way around.",
   },
   {
     icon: Lock,
-    title: "Your session, your data",
-    description: "Delete a session and its documents and generated PDFs go with it.",
-  },
-  {
-    icon: TimerReset,
-    title: "Nothing retained",
-    description: "Uploads exist only for the lifetime of your form-filling session.",
+    title: "You control what's kept",
+    description:
+      "Delete a document and every value only it supported disappears everywhere. Delete the session to remove its data.",
   },
 ];
 
@@ -89,6 +107,7 @@ export function Security() {
       id="security"
       eyebrow="Security & privacy"
       title="Built like it's handling your identity — because it is"
+      description="Straight answers about where your documents go and what the system can actually promise."
     >
       <motion.div
         variants={staggerContainer}

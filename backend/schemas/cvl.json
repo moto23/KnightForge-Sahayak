@@ -3,25 +3,304 @@
   "label": "CVL KYC Form",
   "kind": "kyc_form",
   "markers": {
-    "strong": ["know your client", "cdsl ventures"],
-    "weak": ["kyc", "application form", "identity details", "for individuals only", "in person verification"],
+    "strong": [
+      "know your client",
+      "cdsl ventures"
+    ],
+    "weak": [
+      "kyc",
+      "application form",
+      "identity details",
+      "for individuals only",
+      "in person verification",
+      "kyc mode",
+      "application type",
+      "cvl kra",
+      "exploring new horizons",
+      "poi",
+      "poa"
+    ],
     "min_score": 4
   },
+  "required_canonical": [
+    "pan",
+    "name",
+    "father_name",
+    "dob",
+    "gender",
+    "nationality",
+    "address",
+    "city",
+    "state",
+    "pincode",
+    "mobile",
+    "email",
+    "occupation",
+    "income"
+  ],
+  "required_session_fields": [
+    "application_type",
+    "kyc_mode",
+    "marital_status",
+    "residential_status",
+    "district",
+    "country",
+    "poa_document",
+    "poa_document_number",
+    "is_pep",
+    "is_pep_related",
+    "declaration_place",
+    "declaration_date"
+  ],
+  "never_prefill": ["email"],
+  "conditional_required": [
+    {
+      "field_id": "nationality_other",
+      "when_field": "nationality",
+      "equals": [
+        "other"
+      ]
+    },
+    {
+      "field_id": "poi_document",
+      "when_field": "pan",
+      "unless_answered": true
+    }
+  ],
   "fields": [
-    {"canonical": "father_name", "labels": ["father's/spouse name", "father spouse name", "fathers name", "father's name"]},
-    {"canonical": "name", "labels": ["name of applicant", "full name", "name"]},
-    {"canonical": "dob", "labels": ["date of birth", "dob"]},
-    {"canonical": "gender", "labels": ["gender"]},
-    {"canonical": "nationality", "labels": ["nationality"]},
-    {"canonical": "pan", "labels": ["pan", "permanent account number"], "document_wide": true},
-    {"canonical": "aadhaar", "labels": ["aadhaar", "uid", "unique identification number"], "document_wide": true},
-    {"canonical": "address", "labels": ["address for correspondence", "correspondence address", "address"]},
-    {"canonical": "city", "labels": ["city/town/village", "city town village", "city"]},
-    {"canonical": "state", "labels": ["state"]},
-    {"canonical": "pincode", "labels": ["pin code", "pincode"]},
-    {"canonical": "mobile", "labels": ["mobile"], "document_wide": true},
-    {"canonical": "email", "labels": ["e-mail id", "email id", "e-mail", "email"], "document_wide": true},
-    {"canonical": "income", "labels": ["gross annual income", "annual income"]},
-    {"canonical": "occupation", "labels": ["occupation"]}
-  ]
+    {
+      "canonical": "father_name",
+      "labels": [
+        "father's/spouse's name",
+        "fathers/spouse's name",
+        "father's/spouse name",
+        "father spouse name",
+        "fathers name",
+        "father's name",
+        "name of father"
+      ]
+    },
+    {
+      "canonical": "name",
+      "labels": [
+        "name (same as id proof)",
+        "name of applicant",
+        "applicant name",
+        "full name",
+        "name"
+      ]
+    },
+    {
+      "canonical": "dob",
+      "labels": [
+        "date of birth",
+        "dob"
+      ]
+    },
+    {
+      "canonical": "gender",
+      "labels": [
+        "gender",
+        "sex"
+      ]
+    },
+    {
+      "canonical": "nationality",
+      "labels": [
+        "nationality"
+      ]
+    },
+    {
+      "canonical": "pan",
+      "labels": [
+        "pan",
+        "permanent account number"
+      ],
+      "document_wide": true
+    },
+    {
+      "canonical": "aadhaar",
+      "labels": [
+        "aadhaar card",
+        "aadhaar",
+        "uid",
+        "unique identification number"
+      ],
+      "document_wide": true
+    },
+    {
+      "canonical": "address",
+      "labels": [
+        "correspondence/local address",
+        "address for correspondence",
+        "correspondence address",
+        "line 1",
+        "address"
+      ]
+    },
+    {
+      "canonical": "city",
+      "labels": [
+        "city/town/village",
+        "city town village",
+        "city"
+      ]
+    },
+    {
+      "canonical": "state",
+      "labels": [
+        "state"
+      ]
+    },
+    {
+      "canonical": "pincode",
+      "labels": [
+        "pin code",
+        "pincode"
+      ]
+    },
+    {
+      "canonical": "mobile",
+      "labels": [
+        "mobile no",
+        "mobile"
+      ],
+      "document_wide": true
+    },
+    {
+      "canonical": "email",
+      "labels": [
+        "e-mail id",
+        "email id",
+        "e-mail",
+        "email"
+      ],
+      "document_wide": true
+    },
+    {
+      "canonical": "income",
+      "labels": [
+        "gross annual income",
+        "annual income"
+      ]
+    },
+    {
+      "canonical": "occupation",
+      "labels": [
+        "occupation"
+      ]
+    },
+    {
+      "extra_key": "application_number",
+      "extra_label": "Application Number",
+      "labels": [
+        "application number"
+      ]
+    },
+    {
+      "extra_key": "application_type",
+      "extra_label": "Application Type",
+      "labels": [
+        "application type"
+      ]
+    },
+    {
+      "extra_key": "kyc_mode",
+      "extra_label": "KYC Mode",
+      "labels": [
+        "kyc mode"
+      ]
+    },
+    {
+      "extra_key": "maiden_name",
+      "extra_label": "Maiden Name",
+      "labels": [
+        "maiden name"
+      ]
+    },
+    {
+      "extra_key": "marital_status",
+      "extra_label": "Marital Status",
+      "labels": [
+        "marital status"
+      ]
+    },
+    {
+      "extra_key": "residential_status",
+      "extra_label": "Residential Status",
+      "labels": [
+        "residential status"
+      ]
+    },
+    {
+      "extra_key": "district",
+      "extra_label": "District",
+      "labels": [
+        "district"
+      ]
+    },
+    {
+      "extra_key": "country",
+      "extra_label": "Country",
+      "labels": [
+        "country"
+      ]
+    },
+    {
+      "extra_key": "address_type",
+      "extra_label": "Address Type",
+      "labels": [
+        "address type"
+      ]
+    },
+    {
+      "extra_key": "permanent_address",
+      "extra_label": "Permanent Address",
+      "labels": [
+        "permanent residence address",
+        "permanent address",
+        "overseas address"
+      ]
+    },
+    {
+      "extra_key": "identification_number",
+      "extra_label": "POI Identification Number",
+      "labels": [
+        "identification number"
+      ]
+    },
+    {
+      "extra_key": "telephone_office",
+      "extra_label": "Tel (Off)",
+      "labels": [
+        "tel (off)",
+        "tel off"
+      ]
+    },
+    {
+      "extra_key": "telephone_residence",
+      "extra_label": "Tel (Res)",
+      "labels": [
+        "tel (res)",
+        "tel res"
+      ]
+    },
+    {
+      "extra_key": "declaration_place",
+      "extra_label": "Declaration Place",
+      "labels": [
+        "place"
+      ]
+    },
+    {
+      "extra_key": "declaration_date",
+      "extra_label": "Declaration Date",
+      "labels": [
+        "date"
+      ],
+      "value_kind": "date"
+    }
+  ],
+  "requires_photo": true,
+  "requires_signature": true
 }

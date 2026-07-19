@@ -25,7 +25,17 @@ class RenameChatRequest(BaseModel):
 class AskRequest(BaseModel):
     """Body of POST /chats/{chat_id}/messages."""
 
-    question: str = Field(..., min_length=3, max_length=500, description="The user's question.")
+    # min_length 1, matching /knowledge/query: "Hi" is two characters and was
+    # rejected with a 422 before routing could ever see it.
+    question: str = Field(..., min_length=1, max_length=500, description="The user's question.")
+    session_id: str | None = Field(
+        None,
+        description=(
+            "The active KYC session, when there is one, so questions about the "
+            "user's own progress are answered from that session's authoritative "
+            "state instead of from the document corpus."
+        ),
+    )
 
 
 class ChatCitation(BaseModel):

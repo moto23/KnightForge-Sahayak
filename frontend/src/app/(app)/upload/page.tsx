@@ -13,8 +13,12 @@ import {
   DocumentCard,
   type WorkspaceDocument,
 } from "@/components/upload/document-card";
-import { DOCUMENT_TYPES, PRIMARY_FORMS } from "@/components/upload/document-types";
+import {
+  PRIMARY_FORMS,
+  SUPPORTING_DOCUMENT_HINTS,
+} from "@/components/upload/document-types";
 import { ProfilePanel } from "@/components/upload/profile-panel";
+import { TemplateLibrary } from "@/components/upload/template-library";
 import { UploadHistoryPanel } from "@/components/upload/upload-history-panel";
 import { Button } from "@/components/ui/button";
 import {
@@ -62,9 +66,6 @@ export default function UploadPage() {
   const [prefillingKey, setPrefillingKey] = React.useState<string | null>(null);
   const [profile, setProfile] = React.useState<UnifiedProfileResponse | null>(null);
   const [resolvingId, setResolvingId] = React.useState<string | null>(null);
-  // Phase 13: the type must be chosen BEFORE uploading; stored with history.
-  const [documentType, setDocumentType] =
-    React.useState<UploadDocumentType | null>(null);
   const [historyKey, setHistoryKey] = React.useState(0);
   // Phase 13: ONE primary form is the final output; documents are evidence.
   const [primaryForm, setPrimaryForm] = React.useState<string>(PRIMARY_FORMS[0].value);
@@ -75,6 +76,13 @@ export default function UploadPage() {
     (fieldId: string) => fieldMap.get(fieldId)?.display_name ?? fieldId,
     [fieldMap],
   );
+
+  /**
+   * The primary form file, if one was attached (at most one by construction).
+   * A REJECTED file does not count — it was never accepted as the primary
+   * form, so the dropzone must stay open for the user to try the right one.
+   */
+  const primaryDoc = docs.find((d) => d.isPrimary && d.phase !== "rejected") ?? null;
 
   const patchDoc = React.useCallback(
     (key: string, patch: Partial<WorkspaceDocument>) => {
@@ -87,7 +95,11 @@ export default function UploadPage() {
 
   /* --- initial load: existing documents + their cached extractions ---- */
   const fetchExisting = React.useCallback(async (): Promise<WorkspaceDocument[]> => {
-    const { documents } = await uploadService.list();
+    // Scoped to THIS session: an unscoped list pulls in documents from
+    // earlier workflows, which is how a stale bank statement appeared
+    // beside a freshly selected PAN + Aadhaar.
+    if (!sessionId) return [];
+    const { documents } = await uploadService.list(sessionId);
     return Promise.all(
       documents.map(async (meta) => {
         // Cached understanding may or may not exist — 404 is normal.
@@ -108,13 +120,13 @@ export default function UploadPage() {
           extraction,
           docType: null,
           errorMessage: extraction ? null : "Not analyzed yet — re-upload to process.",
-          // Persistent preview: the backend serves the stored bytes back, so
-          // "View document" survives OCR, refresh, and navigation.
-          previewUrl: uploadService.fileUrl(meta.document_id),
+          // Fetched lazily below with the auth header — a raw URL in an
+          // <img src> is an anonymous request and 404s for owned files.
+          previewUrl: null,
         };
       }),
     );
-  }, []);
+  }, [sessionId]);
 
   /* --- unified profile (Phase 11) -------------------------------------- */
 
@@ -152,13 +164,19 @@ export default function UploadPage() {
     }
   };
 
-  /** Re-fetch the merged profile (used after deletes / on demand). */
+  /**
+   * Re-fetch the merged profile — the authoritative recompute. Returns the
+   * snapshot so callers (delete) can act on what survived.
+   */
   const refreshProfile = React.useCallback(
-    async (sid: string) => {
+    async (sid: string): Promise<UnifiedProfileResponse | null> => {
       try {
-        applyProfileSnapshot(await intelligenceService.profile(sid));
+        const snapshot = await intelligenceService.profile(sid);
+        applyProfileSnapshot(snapshot);
+        return snapshot;
       } catch {
         /* profile is progressive enhancement — the list keeps working */
+        return null;
       }
     },
     [applyProfileSnapshot],
@@ -212,31 +230,57 @@ export default function UploadPage() {
   };
 
   /* --- upload + OCR pipeline per file --------------------------------- */
-  const handleFiles = (files: File[]) => {
-    if (!documentType) {
-      toast.error("Choose a document type first", {
-        description: "Select what you're uploading — it's stored with your history.",
+
+  /** Shape/size gate shared by both dropzones. */
+  const isUploadable = (file: File) => {
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      toast.error(`${file.name}: unsupported type`, {
+        description: "Please upload a PDF, PNG or JPG.",
       });
-      return;
+      return false;
     }
-    for (const file of files) {
-      if (!ALLOWED_TYPES.includes(file.type)) {
-        toast.error(`${file.name}: unsupported type`, {
-          description: "Please upload a PDF, PNG or JPG.",
-        });
-        continue;
-      }
-      if (file.size > MAX_UPLOAD_BYTES) {
-        toast.error(`${file.name}: too large`, {
-          description: "Maximum file size is 10 MB.",
-        });
-        continue;
-      }
-      void processFile(file, documentType);
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast.error(`${file.name}: too large`, {
+        description: "Maximum file size is 10 MB.",
+      });
+      return false;
+    }
+    return true;
+  };
+
+  /**
+   * Supporting documents: one OR many at once, with no type to choose —
+   * the backend classifies each file independently. Each runs its own
+   * pipeline, so a failure on one never blocks the others.
+   */
+  const handleFiles = (files: File[]) => {
+    for (const file of files.filter(isUploadable)) {
+      void processFile(file, "other"); // placeholder; the classifier decides
     }
   };
 
-  const processFile = async (file: File, selectedType: UploadDocumentType) => {
+  /**
+   * The primary form itself (blank, partly filled or filled) — at most ONE
+   * file, and never gated on a supporting-document type: uploading only your
+   * primary form is a complete, valid workflow on its own.
+   */
+  const handlePrimaryFile = (files: File[]) => {
+    const [file, ...rest] = files;
+    if (!file) return;
+    if (rest.length > 0) {
+      toast.warning("Only one primary form", {
+        description: `Using ${file.name}. Add the rest as supporting documents.`,
+      });
+    }
+    if (!isUploadable(file)) return;
+    void processFile(file, "kyc_form", { primary: true });
+  };
+
+  const processFile = async (
+    file: File,
+    selectedType: UploadDocumentType,
+    options: { primary?: boolean } = {},
+  ) => {
     const key = `${file.name}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     // Temporary object URL so the preview works while the upload is in flight;
     // swapped for the backend's persistent file URL once storage confirms.
@@ -252,6 +296,7 @@ export default function UploadPage() {
         uploadPercent: 0,
         extraction: null,
         docType: null,
+        isPrimary: options.primary === true,
         errorMessage: null,
         previewUrl: blobUrl,
       },
@@ -266,13 +311,9 @@ export default function UploadPage() {
       );
       documentId = uploaded.document.document_id;
       setHistoryKey((k) => k + 1); // history panel picks up the new row
-      // Preview now points at the stored bytes — persistent across refresh.
-      patchDoc(key, {
-        documentId,
-        phase: "processing",
-        previewUrl: uploadService.fileUrl(documentId),
-      });
-      URL.revokeObjectURL(blobUrl);
+      // Keep the LOCAL object URL from the file the user just chose: it is
+      // already correct, costs no round trip, and needs no auth header.
+      patchDoc(key, { documentId, phase: "processing" });
       toast.success(`${file.name} uploaded`, {
         description: "Reading the document now…",
       });
@@ -318,7 +359,11 @@ export default function UploadPage() {
           /* non-fatal — the profile still merges; retried next time */
         }
       }
-      const result = await intelligenceService.process(documentId, sid);
+      const result = await intelligenceService.process(
+        documentId,
+        sid,
+        options.primary === true,
+      );
       patchDoc(key, { docType: result.document.document_type });
       // Provenance: deleting this document later rolls back exactly the
       // session answers whose merged value came from it.
@@ -340,8 +385,45 @@ export default function UploadPage() {
           },
         );
       }
-    } catch {
-      /* intelligence is progressive enhancement — manual prefill still works */
+    } catch (err) {
+      const apiError = toApiError(err);
+      // The backend judges the SLOT by document content, not by filename. A
+      // PAN card dropped into the primary box (or a real KYC form dropped into
+      // supporting) is refused before it can activate or merge — so the file
+      // is discarded here rather than left sitting in a slot it doesn't
+      // belong to. Per-file: other uploads in the same batch are unaffected.
+      if (
+        apiError.code === "not_a_primary_form" ||
+        apiError.code === "primary_form_in_supporting_slot"
+      ) {
+        // The backend document is deleted straight away — a rejected file is
+        // not part of this session. The card then keeps its explanation but
+        // MUST forget the document id: leaving it set made the card's Delete
+        // button call DELETE /upload/{id} on a document that no longer exists,
+        // which failed with "Document '<id>' was not found." From here on the
+        // card is purely local and its action is a dismiss.
+        let serverCopyRemoved = true;
+        try {
+          await uploadService.remove(documentId);
+        } catch {
+          // Already gone, or the call failed. Either way the id is no longer
+          // safe to delete again; the card stays dismissible locally.
+          serverCopyRemoved = false;
+        }
+        patchDoc(key, {
+          phase: "rejected",
+          documentId: null,
+          previewUrl: null,
+          errorMessage: apiError.message,
+          serverCopyRemoved,
+        });
+        setHistoryKey((k) => k + 1);
+        toast.error(`${file.name} wasn't accepted here`, {
+          description: apiError.message,
+        });
+      }
+      /* anything else: intelligence is progressive enhancement — manual
+         prefill still works, so the document stays as analyzed */
     } finally {
       setHistoryKey((k) => k + 1); // OCR/processing statuses changed
     }
@@ -413,25 +495,45 @@ export default function UploadPage() {
 
   /* --- delete ---------------------------------------------------------- */
   const handleDelete = async (doc: WorkspaceDocument) => {
-    if (!doc.documentId) return;
+    // A rejected card has no backend document (it was removed the moment it
+    // was refused), so "delete" here is a local dismiss. Calling the API would
+    // 404 on an id that is deliberately gone.
+    if (doc.phase === "rejected" || !doc.documentId) {
+      setDocs((prev) => prev.filter((d) => d.key !== doc.key));
+      if (doc.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(doc.previewUrl);
+      return;
+    }
     const previous = docs;
     // Optimistic removal with rollback on failure.
     setDocs((prev) => prev.filter((d) => d.key !== doc.key));
     try {
       await uploadService.remove(doc.documentId);
       if (doc.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(doc.previewUrl);
-      // Never leave stale session data: clear every answer this document
-      // prefilled, then progress / next question recompute everywhere.
-      // (The document is already gone — a rollback hiccup must not undo the UI.)
+
+      // ONE authoritative recomputation, in this order:
+      //   1. the backend re-derives the whole profile from the REMAINING
+      //      evidence — pruning this document, re-merging, re-resolving
+      //      conflicts, and retracting only values it still owns and that
+      //      nothing else supports;
+      //   2. whatever it still reports as applied is protected;
+      //   3. the legacy rollback then sweeps only unowned leftovers.
+      // Doing it the other way round deleted values by field name and lost
+      // ones a second document still supported.
       let cleared = 0;
+      let stillApplied: string[] = [];
       try {
-        cleared = await rollbackPrefill(doc.documentId);
+        if (sessionId) {
+          const snapshot = await refreshProfile(sessionId);
+          stillApplied = snapshot?.applied_field_ids ?? [];
+        }
       } catch {
         /* refresh() on the next page visit re-syncs */
       }
-      // Re-merge the unified profile without this document (the backend
-      // prunes it and retracts unsupported values automatically).
-      if (sessionId) await refreshProfile(sessionId);
+      try {
+        cleared = await rollbackPrefill(doc.documentId, stillApplied);
+      } catch {
+        /* refresh() on the next page visit re-syncs */
+      }
       setHistoryKey((k) => k + 1); // history row flips to "deleted"
       toast(`${doc.filename} removed`, {
         description:
@@ -451,11 +553,17 @@ export default function UploadPage() {
         title="Upload documents"
         description="Drop the KYC forms and ID documents you already have — Sahayak detects each one, merges them into a single profile, and prefills everything it can verify."
         actions={
-          <Button variant="outline" asChild>
-            <Link href="/interview">
-              Skip to interview <ArrowRight aria-hidden />
-            </Link>
-          </Button>
+          <>
+            {/* Blank supported forms, for users who don't have one to hand.
+                Kept in the header beside "Skip to interview" so the journey
+                reads: get a form -> upload it -> add documents -> generate. */}
+            <TemplateLibrary />
+            <Button variant="outline" asChild>
+              <Link href="/interview">
+                Skip to interview <ArrowRight aria-hidden />
+              </Link>
+            </Button>
+          </>
         }
       />
 
@@ -495,59 +603,74 @@ export default function UploadPage() {
                   </button>
                 ))}
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Supporting documents: pick the type BEFORE dropping the file. */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">
-                2. Supporting documents — what are you uploading?
-              </CardTitle>
-              <CardDescription>
-                Upload as many as you like — each is detected, fully extracted,
-                and merged into one profile. The type is saved with your history.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div
-                role="radiogroup"
-                aria-label="Document type"
-                className="flex flex-wrap gap-2"
-              >
-                {DOCUMENT_TYPES.map((type) => (
-                  <button
-                    key={type.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={documentType === type.value}
-                    onClick={() => setDocumentType(type.value)}
-                    className={cn(
-                      "rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
-                      documentType === type.value
-                        ? "border-primary bg-primary/15 text-primary"
-                        : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
-                    )}
-                  >
-                    {type.label}
-                  </button>
-                ))}
+              {/* Optional: upload the form itself (blank, part-filled or
+                  filled). At most one — and never gated on a supporting
+                  type, so "primary form only" is a valid workflow. */}
+              <div className="mt-4 border-t border-border pt-4">
+                <p className="mb-2 text-xs text-muted-foreground">
+                  {primaryDoc
+                    ? `Attached: ${primaryDoc.filename} — any values already on it are extracted and prefilled.`
+                    : "Optional: attach your copy of this form (blank, partly filled or filled). Anything already filled in is read and prefilled."}
+                </p>
+                {!primaryDoc && (
+                  // Points at the header dropdown: without this the template
+                  // library is only discoverable by chance.
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    Don&apos;t have the form? Grab a blank one from{" "}
+                    <span className="font-medium text-foreground">
+                      KYC form templates
+                    </span>{" "}
+                    at the top of this page.
+                  </p>
+                )}
+                {!primaryDoc && (
+                  <UploadCard
+                    onFiles={handlePrimaryFile}
+                    className="min-h-32 sm:min-h-36"
+                  />
+                )}
               </div>
             </CardContent>
           </Card>
 
-          {/* Dimmed until a type is chosen — handleFiles enforces the rule. */}
-          <div className={cn(!documentType && "opacity-60")}>
-            <UploadCard onFiles={handleFiles} />
-          </div>
+          {/* Supporting documents: no type picker — the classifier decides. */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">2. Supporting documents</CardTitle>
+              <CardDescription>
+                Upload one or multiple supporting documents. Sahayak
+                automatically detects each document type, extracts its fields,
+                and merges verified information into your profile.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {/* Informational only — NOT selectable. Backend auto-detection
+                  stays authoritative, so these just answer "what can I put
+                  here?" without implying a choice that would be ignored. */}
+              <ul
+                className="flex flex-wrap gap-1.5"
+                aria-label="Document types Sahayak detects automatically"
+              >
+                {SUPPORTING_DOCUMENT_HINTS.map((hint) => (
+                  <li
+                    key={hint}
+                    className="rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground"
+                  >
+                    {hint}
+                  </li>
+                ))}
+              </ul>
+              <UploadCard onFiles={handleFiles} />
+            </CardContent>
+          </Card>
 
           <Card>
             <CardContent className="flex gap-3 p-4">
               <Info className="mt-0.5 size-4.5 shrink-0 text-accent" aria-hidden />
               <p className="text-sm text-muted-foreground">
-                {documentType
-                  ? "Best results: a clear, well-lit scan. Files are processed locally and deleted when your session ends."
-                  : "Step 2: choose the supporting-document type above, then drop your file."}
+                Best results: a clear, well-lit scan. Your files stay on your
+                Sahayak backend — you can delete any of them at any time.
               </p>
             </CardContent>
           </Card>

@@ -49,7 +49,7 @@ export const APP_NAV: NavSection[] = [
         description: "Upload documents for OCR prefill",
       },
       {
-        title: "AI Interview",
+        title: "AI-Guided Completion",
         href: "/interview",
         icon: MessageSquareText,
         description: "Answer the remaining fields conversationally",
@@ -96,8 +96,8 @@ export const APP_NAV: NavSection[] = [
 /** Ordered product workflow — powers steppers and the landing visualization. */
 export const WORKFLOW_STEPS = [
   { key: "upload", label: "Upload", detail: "Drop your existing KYC or ID document" },
-  { key: "ocr", label: "OCR", detail: "Text is read locally from the scan" },
-  { key: "ai", label: "AI Interview", detail: "A guided chat fills the gaps" },
+  { key: "ocr", label: "Extract", detail: "Fields are read from your documents" },
+  { key: "ai", label: "AI-Guided Completion", detail: "A guided chat fills the gaps" },
   { key: "validation", label: "Validation", detail: "Every field checked deterministically" },
   { key: "pdf", label: "PDF", detail: "Your filled, ready-to-sign form" },
 ] as const;

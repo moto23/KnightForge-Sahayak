@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, HelpCircle, RotateCcw, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
+import { AssetUploadCard } from "@/components/assets/asset-upload-card";
 import { ChatBubble, TypingIndicator } from "@/components/shared/chat-bubble";
 import { ErrorState, LoadingAnimation, SuccessState } from "@/components/shared/states";
 import { StatusBadge } from "@/components/ui/badge";
@@ -12,10 +13,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import { useAsync } from "@/hooks/use-async";
 import { useKycSession } from "@/hooks/use-kyc-session";
 import { toApiError } from "@/services/api-client";
-import { conversationService, sessionService } from "@/services";
-import type { KYCField } from "@/types/api";
+import { assetsService, conversationService, sessionService } from "@/services";
+import type { AssetRequirement, KYCField } from "@/types/api";
 
 type UiMessage = {
   id: string;
@@ -35,7 +37,7 @@ const now = () =>
   new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
 /**
- * AI Interview Workspace (Phase 9B.1 — fully integrated).
+ * AI-Guided Completion Workspace (Phase 9B.1 — fully integrated).
  *
  * Uses the real /conversation endpoints: start (or resume mid-session),
  * reply (extraction + validation + next question in one call), explain.
@@ -47,6 +49,7 @@ export default function InterviewPage() {
     session,
     progress,
     restoring,
+    schema,
     fieldMap,
     ensureSession,
     adoptSession,
@@ -64,6 +67,108 @@ export default function InterviewPage() {
   const bootedRef = React.useRef(false);
 
   const completed = progress?.interview_status === "completed";
+
+  /* --- form assets (photo / signature) --------------------------------- */
+
+  /**
+   * What this form requires. Only ever non-empty when the ACTIVE form actually
+   * asks for an image; failures are silent, because assets are a conditional
+   * extra rather than part of the core interview.
+   */
+  const assetState = useAsync(
+    (signal) =>
+      sessionId
+        ? assetsService
+            .requirements(sessionId, signal)
+            .then((r) => r.requirements)
+            .catch(() => [] as AssetRequirement[])
+        : Promise.resolve([] as AssetRequirement[]),
+    [sessionId],
+  );
+  const assetReqs = React.useMemo(
+    () => assetState.data ?? [],
+    [assetState.data],
+  );
+
+  /**
+   * The asset the interview is asking for RIGHT NOW.
+   *
+   * An asset field cannot be answered by typing — its value is an uploaded
+   * image — so when it comes up the composer is swapped for an upload card
+   * rather than left accepting text that could never validate.
+   */
+  const activeAsset = React.useMemo(
+    () =>
+      currentQuestion?.field_type === "asset"
+        ? (assetReqs.find((r) => r.field_id === currentQuestion.id) ?? null)
+        : null,
+    [currentQuestion, assetReqs],
+  );
+
+  /** After an upload/removal: re-sync progress AND the next question. */
+  const onAssetChanged = React.useCallback(async () => {
+    if (!sessionId) return;
+    assetState.reload();
+    try {
+      const next = await sessionService.nextQuestion(sessionId);
+      setCurrentQuestion(next.question);
+    } catch {
+      /* refresh() below still updates progress */
+    }
+    await refresh();
+  }, [sessionId, assetState, refresh]);
+
+  /**
+   * The asset being asked for is already supplied — accept it and move on.
+   *
+   * Re-runs the same recompute every other answer uses, then asks for the next
+   * question. Without this the conversation stalls: the field is answered, so
+   * re-uploading changes nothing, and no other control advances it.
+   */
+  const keepingRef = React.useRef(false);
+  const keepAssetAndContinue = React.useCallback(async () => {
+    if (!sessionId || keepingRef.current) return;
+    // One in-flight continue at a time. The button is disabled while it runs,
+    // but a ref also survives a re-render, so the request cannot be doubled.
+    keepingRef.current = true;
+    try {
+      // Recompute FIRST: the backend re-adopts an asset the session already
+      // holds, so the field this question is asking about becomes answered
+      // before we ask what comes next. Without that ordering the same asset
+      // question came straight back.
+      await refresh();
+      const asked = currentQuestion?.id;
+      const next = await sessionService.nextQuestion(sessionId);
+      setCurrentQuestion(next.question);
+      if (next.question && next.question.id === asked) {
+        // The field is still outstanding, so nothing was actually settled.
+        // Say so rather than repeating the question as if we had moved on.
+        toast.error("That still needs an image", {
+          description: "Please upload it to continue.",
+        });
+        return;
+      }
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: nextId(),
+          role: "assistant",
+          at: now(),
+          content: next.completed
+            ? "Perfect — that's everything. You can generate your completed form now."
+            : next.question
+              ? `Great, we'll keep the one you already uploaded.
+
+${next.question.display_name}${next.question.help_text ? ` — ${next.question.help_text}` : ""}`
+              : "Great, we'll keep the one you already uploaded.",
+        },
+      ]);
+    } catch (err) {
+      toast.error("Couldn't continue", { description: toApiError(err).message });
+    } finally {
+      keepingRef.current = false;
+    }
+  }, [sessionId, refresh, currentQuestion]);
 
   /* Auto-scroll on new messages. */
   React.useEffect(() => {
@@ -290,7 +395,22 @@ export default function InterviewPage() {
           )}
         </div>
 
-        {/* Composer */}
+        {/* Asset step: this question wants an image, so the text composer is
+            replaced rather than left accepting input that cannot validate. */}
+        {activeAsset && sessionId && !completed ? (
+          <div className="space-y-2 border-t border-border p-3 sm:p-4">
+            <p className="text-xs text-muted-foreground">
+              This one needs an image rather than a typed answer.
+            </p>
+            <AssetUploadCard
+              sessionId={sessionId}
+              requirement={activeAsset}
+              onChanged={onAssetChanged}
+              onKeepAndContinue={keepAssetAndContinue}
+            />
+          </div>
+        ) : (
+        /* Composer */
         <form
           className="flex items-center gap-2 border-t border-border p-3 sm:p-4"
           onSubmit={(e) => {
@@ -329,6 +449,7 @@ export default function InterviewPage() {
             <Send className="size-4.5" />
           </Button>
         </form>
+        )}
       </Card>
 
       {/* Live progress sidebar */}
@@ -336,7 +457,7 @@ export default function InterviewPage() {
         <Card>
           <CardContent className="space-y-2.5 p-4 sm:p-5">
             <div className="flex items-center justify-between text-sm">
-              <span className="font-medium">CVL Individual KYC</span>
+              <span className="font-medium">{schema?.title ?? "Your KYC form"}</span>
               <span className="tabular-nums text-muted-foreground">
                 {progressPercent}%
               </span>
@@ -347,6 +468,23 @@ export default function InterviewPage() {
             </p>
           </CardContent>
         </Card>
+
+        {/* Photo / signature — rendered ONLY when this form requires them.
+            Kept beside the chat so they can be supplied at any point, not
+            just when the interview happens to reach them. */}
+        {sessionId &&
+          assetReqs
+            // The one being asked right now already has a card in the chat
+            // column — showing it twice reads as two separate uploads.
+            .filter((r) => r.required && r.kind !== activeAsset?.kind)
+            .map((requirement) => (
+              <AssetUploadCard
+                key={requirement.kind}
+                sessionId={sessionId}
+                requirement={requirement}
+                onChanged={onAssetChanged}
+              />
+            ))}
 
         {completed ? (
           <SuccessState

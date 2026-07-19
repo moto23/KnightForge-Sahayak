@@ -3,9 +3,9 @@
 import { motion } from "framer-motion";
 import {
   FileOutput,
+  Layers,
   MessageSquareText,
   ScanText,
-  ShieldCheck,
   UploadCloud,
   type LucideIcon,
 } from "lucide-react";
@@ -17,28 +17,33 @@ import { staggerContainer, fadeUp, viewportOnce } from "@/lib/motion";
 const STEPS: { icon: LucideIcon; title: string; description: string }[] = [
   {
     icon: UploadCloud,
-    title: "Upload",
-    description: "Drop any KYC scan or ID document — PDF or photo.",
+    title: "Your primary form",
+    description:
+      "Choose the KYC form you need to submit — CVL/CDSL, SBI, HDFC, ICICI or Axis — and upload your copy.",
+  },
+  {
+    icon: Layers,
+    title: "Supporting documents",
+    description:
+      "Add PAN, Aadhaar, passport, bank statement, utility bill and more — several at once. Each type is detected for you.",
   },
   {
     icon: ScanText,
-    title: "OCR",
-    description: "Text is read locally and mapped to real form fields.",
+    title: "Read & merged",
+    description:
+      "Sahayak reads each document and merges what it finds into one profile, tracking which document every value came from.",
   },
   {
     icon: MessageSquareText,
-    title: "AI Interview",
-    description: "A friendly chat asks only what's still missing.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Validation",
-    description: "PAN, Aadhaar, PIN — every field checked deterministically.",
+    title: "Asked only what's missing",
+    description:
+      "The AI-Guided Completion covers the gaps your form actually requires, while deterministic checks validate every answer.",
   },
   {
     icon: FileOutput,
-    title: "PDF",
-    description: "Your answers are placed pixel-perfectly onto the official form.",
+    title: "Your completed form",
+    description:
+      "Answers are written onto a copy of the form you uploaded. Review it, edit, and save new versions as you go.",
   },
 ];
 
@@ -47,8 +52,8 @@ export function HowItWorks() {
     <SectionShell
       id="how-it-works"
       eyebrow="How it works"
-      title="Five steps. Zero form anxiety."
-      description="Sahayak does the reading, remembering and rule-checking — you just answer questions in plain language."
+      title="Five steps, and most of them run themselves"
+      description="Sahayak does the reading, merging and rule-checking. You answer the handful of questions your documents couldn't."
     >
       <motion.ol
         variants={staggerContainer}

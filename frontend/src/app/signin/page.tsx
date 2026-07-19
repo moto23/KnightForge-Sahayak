@@ -20,10 +20,48 @@ import { useAuth } from "@/contexts/auth-context";
 import { toApiError } from "@/services/api-client";
 import { authService } from "@/services";
 
+/**
+ * Email shape. Deliberately stricter than "contains an @": a local part, a
+ * domain with at least one dot, and a 2+ character TLD. "a@b" and "me@gmail"
+ * are the two that slip through a naive check and then fail server-side.
+ */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
+
+/**
+ * Password policy — mirrors backend/app/schemas/auth.py verbatim.
+ * If one side changes, change BOTH: a password this form accepts but the API
+ * rejects surfaces to the user as an unexplained "could not create account".
+ */
+const PASSWORD_MIN_LENGTH = 6;
+
+const passwordField = z
+  .string()
+  .min(PASSWORD_MIN_LENGTH, `At least ${PASSWORD_MIN_LENGTH} characters`)
+  .regex(/[a-z]/, "Add a lowercase letter")
+  .regex(/[A-Z]/, "Add an uppercase letter")
+  .regex(/[0-9]/, "Add a number")
+  .regex(/[^A-Za-z0-9]/, "Add a special character (e.g. ! ? @ #)");
+
+/**
+ * Sign-in and registration have genuinely different rules, so they are two
+ * schemas rather than one with optional fields:
+ *  - signing IN must NOT apply the policy (existing accounts predate it, and
+ *    enforcing it here would also hint at what a valid password looks like);
+ *  - registering requires a real name and a policy-compliant password.
+ */
 const signInSchema = z.object({
-  email: z.email("Enter a valid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  email: z.string().regex(EMAIL_PATTERN, "Enter a valid email address"),
+  password: z.string().min(1, "Enter your password"),
   fullName: z.string().optional(),
+});
+
+const registerSchema = z.object({
+  email: z.string().regex(EMAIL_PATTERN, "Enter a valid email address"),
+  password: passwordField,
+  fullName: z
+    .string()
+    .trim()
+    .min(1, "Enter your name"),
 });
 
 type SignInValues = z.infer<typeof signInSchema>;
@@ -62,8 +100,22 @@ function SignInContent() {
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors, isSubmitting },
-  } = useForm<SignInValues>({ resolver: zodResolver(signInSchema) });
+  } = useForm<SignInValues>({
+    // Validate from the first keystroke and on every one after, so an error
+    // appears as soon as the input is wrong and disappears the instant it is
+    // corrected — rather than waiting for a blur or a rejected submit.
+    mode: "onChange",
+    reValidateMode: "onChange",
+    resolver: zodResolver(mode === "register" ? registerSchema : signInSchema),
+  });
+
+  /** Switching mode changes the rules, so stale errors must not carry over. */
+  const switchMode = (next: "signin" | "register") => {
+    setMode(next);
+    reset({ email: "", password: "", fullName: "" });
+  };
 
   /* Surface OAuth callback errors (?error=...) once. */
   React.useEffect(() => {
@@ -93,10 +145,12 @@ function SignInContent() {
       const profile =
         mode === "signin"
           ? await login(values.email, values.password)
+          // Name is a validated, required field when registering, so it is
+          // sent as typed — no silent fallback to the email's local part.
           : await registerAccount(
               values.email,
               values.password,
-              values.fullName?.trim() || values.email.split("@")[0],
+              (values.fullName ?? "").trim(),
             );
       toast.success(mode === "signin" ? "Welcome back!" : "Account created", {
         description: `Signed in as ${profile.email}.`,
@@ -194,8 +248,14 @@ function SignInContent() {
                   type="text"
                   placeholder="Your name"
                   autoComplete="name"
+                  aria-invalid={!!errors.fullName}
                   {...register("fullName")}
                 />
+                {errors.fullName && (
+                  <p className="text-xs text-destructive" role="alert">
+                    {errors.fullName.message}
+                  </p>
+                )}
               </div>
             )}
 
@@ -226,10 +286,19 @@ function SignInContent() {
                 aria-invalid={!!errors.password}
                 {...register("password")}
               />
-              {errors.password && (
+              {errors.password ? (
                 <p className="text-xs text-destructive" role="alert">
                   {errors.password.message}
                 </p>
+              ) : (
+                mode === "register" && (
+                  // Stated up front rather than only on failure — the rules
+                  // are the same ones the backend enforces.
+                  <p className="text-xs text-muted-foreground">
+                    At least {PASSWORD_MIN_LENGTH} characters, with an uppercase
+                    and a lowercase letter, a number and a special character.
+                  </p>
+                )
               )}
             </div>
 
@@ -258,7 +327,7 @@ function SignInContent() {
                 <button
                   type="button"
                   className="text-primary hover:underline"
-                  onClick={() => setMode("register")}
+                  onClick={() => switchMode("register")}
                 >
                   Create an account
                 </button>
@@ -269,7 +338,7 @@ function SignInContent() {
                 <button
                   type="button"
                   className="text-primary hover:underline"
-                  onClick={() => setMode("signin")}
+                  onClick={() => switchMode("signin")}
                 >
                   Sign in
                 </button>

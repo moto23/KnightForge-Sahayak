@@ -64,6 +64,23 @@ _CANONICAL_FIELDS: tuple[CanonicalField, ...] = (
     CanonicalField(id="occupation", label="Occupation", session_field_id="occupation", value_kind="choice"),
     CanonicalField(id="income", label="Gross Annual Income", session_field_id="gross_annual_income", value_kind="choice"),
     CanonicalField(id="nationality", label="Nationality", session_field_id="nationality", value_kind="choice"),
+    # Fields a supporting document can supply that an interview field already
+    # exists for. Without these they extracted into the profile and stopped
+    # there, so a passbook could show the account number while the interview
+    # still asked for it.
+    #
+    # Mapping is NOT blanket promotion: a canonical field only reaches a
+    # session when the ACTIVE form lists its session field in
+    # required_session_fields, and it still passes through the normal apply
+    # rules — a user's own answer is never overwritten, an open conflict blocks
+    # the write, and losing its evidence retracts it. Extras with no
+    # semantically matching interview field (customer_id, IFSC, branch,
+    # place_of_birth) deliberately stay profile-only: place of BIRTH is not the
+    # place of SIGNING, and writing one into the other would be a wrong fact.
+    CanonicalField(id="account_number", label="Account Number", session_field_id="account_number", value_kind="text"),
+    CanonicalField(id="ckyc_number", label="CKYC Number", session_field_id="ckycr_number", value_kind="text"),
+    CanonicalField(id="ckycr_number", label="CKYCR Number", session_field_id="ckycr_number", value_kind="text"),
+    CanonicalField(id="district", label="District", session_field_id="district", value_kind="text"),
 )
 
 

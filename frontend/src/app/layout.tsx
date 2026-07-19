@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     template: "%s · KnightForge Sahayak",
   },
   description:
-    "Turn complex KYC forms into a guided AI experience. Upload a document, answer a friendly interview, and download a perfectly filled, validated PDF.",
+    "Turn complex KYC forms into a guided AI experience. Upload your KYC form and supporting documents, answer only what's missing, and download a completed, validated copy of your form.",
 };
 
 export const viewport: Viewport = {

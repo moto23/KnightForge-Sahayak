@@ -15,6 +15,11 @@ from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+# The shipped development secret. Named so the production guard below can
+# recognise it; never use it outside local work.
+_INSECURE_JWT_DEFAULT = "dev-only-secret-change-me"
+
+
 class Settings(BaseSettings):
     # --- App metadata (surfaced in Swagger / OpenAPI docs) ---
     APP_NAME: str = "KnightForge Sahayak API"
@@ -43,7 +48,12 @@ class Settings(BaseSettings):
     # Empty key = AI disabled; every AI-phrased endpoint then serves its
     # deterministic fallback responses instead of failing.
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.5-flash"
+    # Flash-lite carries a far larger free-tier daily allowance than the
+    # full Flash models (which cap at ~20 requests/day/model and are quickly
+    # exhausted by document extraction), so the assistant keeps working.
+    # "-latest" tracks the current supported release rather than pinning a
+    # model that will eventually be retired.
+    GEMINI_MODEL: str = "gemini-flash-lite-latest"
     # Per-request timeout: a hung Gemini call must never hang the interview.
     GEMINI_TIMEOUT_SECONDS: float = 20.0
 
@@ -88,6 +98,18 @@ class Settings(BaseSettings):
     # Uncertain fields stay unanswered so the interview asks about them.
     PREFILL_CONFIDENCE_THRESHOLD: float = 0.75
 
+    # Minimum confidence a MERGED canonical value needs before the Universal
+    # Document Intelligence pipeline writes it into the interview session.
+    #
+    # Deliberately far below PREFILL_CONFIDENCE_THRESHOLD: merged values have
+    # already passed the deterministic Validation Engine, which is the real
+    # gatekeeper. Real-world OCR pages score ~0.65-0.75, so gating validated
+    # values at 0.75 silently dropped almost everything the pipeline read —
+    # the interview then re-asked fields the profile had already resolved.
+    # A value that FAILS validation is capped at 0.35 by the ConfidenceEngine,
+    # so this floor only rejects dire noise, never good data.
+    CANONICAL_APPLY_MIN_CONFIDENCE: float = 0.40
+
     # --- PDF Generation (Phase 8 — Smart PDF Generation Engine) ---
     # The blank KYC form the overlay is painted onto (relative to backend/).
     PDF_TEMPLATE_PATH: str = "../samples/sample-kyc.pdf"
@@ -100,6 +122,10 @@ class Settings(BaseSettings):
     # --- Knowledge RAG Engine (Phase 10) ---
     # Directory of official KYC reference documents to ingest (.md/.txt/.pdf),
     # relative to the backend working directory.
+    # Timezone the assistant states when answering date/time questions. The
+    # user's own zone is never guessed — the answer names this one explicitly.
+    APP_TIMEZONE: str = "Asia/Kolkata"
+
     KNOWLEDGE_DOCS_DIR: str = "knowledge_docs"
     # On-disk home of the ChromaDB vector database (persists across restarts).
     KNOWLEDGE_DB_DIR: str = "knowledge_db"
@@ -130,6 +156,7 @@ class Settings(BaseSettings):
     # e.g. cvl.json, sbi.json, pan.json), relative to the backend working
     # directory. Schemas define OCR labels, aliases, canonical mappings and
     # classification markers — mappings NEVER live in Python business logic.
+    FORM_LAYOUTS_DIR: str = "form_layouts"
     DOCUMENT_SCHEMAS_DIR: str = "schemas"
 
     # --- Auth + persistence (Phase 12) ---
@@ -138,7 +165,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./app.db"
     # HMAC secret for signing JWT access tokens. The default is fine for local
     # dev only — ALWAYS override via .env in any shared environment.
-    JWT_SECRET: str = "dev-only-secret-change-me"
+    JWT_SECRET: str = _INSECURE_JWT_DEFAULT
     JWT_ALGORITHM: str = "HS256"
     # Short-lived access token (sent as a Bearer header, kept in JS memory).
     ACCESS_TOKEN_MINUTES: int = 30
@@ -167,6 +194,53 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> list[str]:
         """Split the CORS_ORIGINS string into a clean list for the middleware."""
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT.strip().lower() in {"production", "prod"}
+
+    @model_validator(mode="after")
+    def _refuse_unsafe_production(self) -> "Settings":
+        """
+        Refuse to BOOT a production process that is configured unsafely.
+
+        These are the settings whose defaults are deliberately convenient for
+        local work and dangerous in the open: a shipped JWT secret lets anyone
+        mint a token for any account, and CORS "*" hands a hostile page the
+        applicant's KYC data through the browser. A warning in a log is not
+        enough — nobody reads the log of a service that started fine — so the
+        process refuses to come up instead.
+
+        Development is untouched: every check is inert unless ENVIRONMENT says
+        production.
+        """
+        if not self.is_production:
+            return self
+
+        problems: list[str] = []
+        if self.JWT_SECRET == _INSECURE_JWT_DEFAULT:
+            problems.append(
+                "JWT_SECRET is still the shipped development value; set a "
+                "unique random secret."
+            )
+        if len(self.JWT_SECRET.encode()) < 32:
+            problems.append(
+                "JWT_SECRET must be at least 32 bytes "
+                f"(currently {len(self.JWT_SECRET.encode())})."
+            )
+        if self.DEBUG:
+            problems.append("DEBUG must be False in production.")
+        if "*" in self.cors_origins_list:
+            problems.append("CORS_ORIGINS must name the deployed frontend, not '*'.")
+        if any(o.startswith("http://") and "localhost" not in o and "127.0.0.1" not in o
+               for o in self.cors_origins_list):
+            problems.append("CORS_ORIGINS must use https:// for non-local origins.")
+
+        if problems:
+            raise ValueError(
+                "Unsafe production configuration:\n  - " + "\n  - ".join(problems)
+            )
+        return self
 
 
 @lru_cache

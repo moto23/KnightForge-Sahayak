@@ -53,7 +53,10 @@ export default function DashboardPage() {
   const health = useAsync((signal) => healthService.check(signal), []);
   // Phase 13 resume inputs: what exists already (uploads / generated PDFs)?
   const uploads = useAsync(() => uploadService.list(), []);
-  const pdfs = useAsync((signal) => pdfService.list(signal), []);
+  const pdfs = useAsync(
+    (signal) => pdfService.list(session?.session_id ?? null, signal),
+    [session?.session_id],
+  );
 
   if (restoring) {
     return <LoadingAnimation label="Loading your workspace…" className="min-h-[50dvh]" />;
@@ -194,8 +197,8 @@ export default function DashboardPage() {
           session
             ? completed
               ? "Your KYC is complete — generate and download the filled form."
-              : "Your CVL Individual KYC is underway. Pick up where you left off."
-            : "Start your KYC journey — upload a document or jump into the AI interview."
+              : "Your KYC is underway. Pick up where you left off."
+            : "Start your KYC — upload your form and supporting documents, or jump straight into the AI-Guided Completion."
         }
         actions={
           <div className="flex items-center gap-2">
@@ -236,7 +239,7 @@ export default function DashboardPage() {
       <GlassCard className="p-5 sm:p-6">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-semibold">
-            {schema?.title ?? "CVL Individual KYC"}
+            {schema?.title ?? "Your KYC form"}
           </p>
           <StatusBadge
             status={
@@ -281,7 +284,9 @@ export default function DashboardPage() {
               title="Form completion"
               percent={progress?.progress_percentage ?? session.progress_percentage}
               answered={progress?.completed_required_fields ?? session.completed_fields.length}
-              total={progress?.required_fields ?? 21}
+              // Required-field counts vary per form — never assume a fixed
+              // number; fall back to what the session itself reports.
+              total={progress?.required_fields ?? session.completed_fields.length}
               className="h-full"
             />
           </motion.div>

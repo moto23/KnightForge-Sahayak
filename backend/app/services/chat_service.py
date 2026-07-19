@@ -28,6 +28,7 @@ from app.core.exceptions import ChatNotFoundError
 from app.domain.knowledge import KnowledgeAnswer
 from app.infrastructure.db.models import ChatConversation, ChatMessage
 from app.services.ai_service import AIService, AIUnavailableError
+from app.services.knowledge_intent import QueryIntent, classify_intent
 from app.services.knowledge_service import KnowledgeService
 from app.services.prompts import build_standalone_question_prompt
 
@@ -110,7 +111,11 @@ class ChatService:
         return list(conversation.messages)
 
     def ask(
-        self, user_id: str, chat_id: str, question: str
+        self,
+        user_id: str,
+        chat_id: str,
+        question: str,
+        workflow_state: str | None = None,
     ) -> tuple[ChatMessage, ChatMessage, KnowledgeAnswer]:
         """
         One full turn: persist the user's question, answer it through the
@@ -125,7 +130,21 @@ class ChatService:
         )
         self._db.add(user_message)
 
-        answer = self._knowledge.query(self._standalone(history, question))
+        # `workflow_state` is the caller's OWN session, already resolved and
+        # ownership-checked by the route. Passed straight through so "what's
+        # left?" is answered from real state on the signed-in path too.
+        # Follow-up rewriting is for RAG: it turns "and the expiry?" into a
+        # standalone question retrieval can match. It must NOT run on a
+        # question about the user's own session — rewriting "What is
+        # remaining?" against KYC history produced "what documents are
+        # remaining", which then classified as a corpus question and was
+        # answered from official documents instead of their actual form.
+        asked = (
+            question
+            if classify_intent(question) is QueryIntent.WORKFLOW
+            else self._standalone(history, question)
+        )
+        answer = self._knowledge.query(asked, None, workflow_state)
 
         assistant_message = ChatMessage(
             conversation_id=conversation.id,

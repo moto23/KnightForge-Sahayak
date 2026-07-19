@@ -293,3 +293,48 @@ export function apiUpload<T>(
 export function absoluteUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
 }
+
+/**
+ * Fetch a protected file and return an object URL for it.
+ *
+ * File endpoints are ownership-checked from the Bearer token, and a browser
+ * CANNOT attach that token to `<img src>`, an `<iframe>`, or a plain download
+ * link — those go out anonymously, so every file belonging to a signed-in user
+ * came back 404 and rendered as a broken thumbnail. Fetching the bytes here,
+ * through the same authenticated path as every other call, and handing the
+ * caller a `blob:` URL keeps the server check exactly as strict while letting
+ * the browser display the result.
+ *
+ * The caller owns the returned URL and must `URL.revokeObjectURL` it.
+ */
+export async function fetchBlobUrl(
+  path: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    signal,
+  });
+  if (!response.ok) throw await parseError(response);
+  return URL.createObjectURL(await response.blob());
+}
+
+/** Fetch a protected file and save it under `filename`. */
+export async function downloadProtectedFile(
+  path: string,
+  filename: string,
+): Promise<void> {
+  const url = await fetchBlobUrl(path);
+  try {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    // Revoked on the next tick: revoking synchronously can cancel the download
+    // in some browsers before it has read the blob.
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
+}

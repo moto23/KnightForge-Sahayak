@@ -3,6 +3,7 @@
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  AlertCircle,
   ChevronDown,
   Eye,
   FileImage,
@@ -11,6 +12,7 @@ import {
   ScanText,
   Sparkles,
   Trash2,
+  X,
 } from "lucide-react";
 
 import { Badge, StatusBadge, type Status } from "@/components/ui/badge";
@@ -19,9 +21,24 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import type { DocumentTypeInfo, OCRExtractResponse } from "@/types/api";
 import { formatBytes } from "@/utils/format";
+import { toast } from "sonner";
 
-/** UI lifecycle of one document in the upload workspace. */
-export type DocPhase = "uploading" | "processing" | "analyzed" | "failed";
+import { fetchBlobUrl } from "@/services/api-client";
+
+/**
+ * UI lifecycle of one document in the upload workspace.
+ *
+ * "rejected" is distinct from "failed" on purpose: nothing went wrong
+ * technically, the file was simply put in the wrong slot (a PAN card as the
+ * primary form, a KYC form as a supporting document). It gets guidance rather
+ * than an error, because the fix is to move it, not to retry it.
+ */
+export type DocPhase =
+  | "uploading"
+  | "processing"
+  | "analyzed"
+  | "failed"
+  | "rejected";
 
 export type WorkspaceDocument = {
   /** Client key (stable across upload → server id swap). */
@@ -35,6 +52,14 @@ export type WorkspaceDocument = {
   extraction: OCRExtractResponse | null;
   /** Detected document type from the intelligence classifier (Phase 11). */
   docType: DocumentTypeInfo | null;
+  /** True for the session's primary form (the final output), not evidence. */
+  isPrimary?: boolean;
+  /**
+   * Rejected cards only: whether the stored copy was successfully removed from
+   * the backend. Purely informational — either way the card is dismissed
+   * locally, never re-deleted through the API.
+   */
+  serverCopyRemoved?: boolean;
   errorMessage: string | null;
   /**
    * URL for viewing the uploaded document: the backend file endpoint for
@@ -49,6 +74,7 @@ const PHASE_TO_STATUS: Record<DocPhase, Status> = {
   processing: "processing",
   analyzed: "analyzed",
   failed: "failed",
+  rejected: "invalid",
 };
 
 function ConfidenceBar({ value }: { value: number }) {
@@ -90,6 +116,48 @@ export function DocumentCard({
 }) {
   const [expanded, setExpanded] = React.useState(false);
   const isPdf = doc.contentType === "application/pdf";
+
+  /* A stored document's thumbnail must be fetched WITH the auth header: the
+     file endpoint is ownership-checked, and an <img src> pointing straight at
+     it is an anonymous request that 404s for anything a signed-in user owns.
+     Only images are fetched — PDFs render an icon either way. */
+  const [fetchedPreview, setFetchedPreview] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (isPdf || doc.previewUrl || !doc.documentId) return;
+    let objectUrl: string | null = null;
+    const controller = new AbortController();
+    void fetchBlobUrl(`/upload/${doc.documentId}/file`, controller.signal)
+      .then((url) => {
+        objectUrl = url;
+        setFetchedPreview(url);
+      })
+      .catch(() => setFetchedPreview(null));
+    return () => {
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [isPdf, doc.previewUrl, doc.documentId]);
+
+  const preview = doc.previewUrl ?? fetchedPreview;
+
+  const openDocument = React.useCallback(async () => {
+    // A local object URL (file still uploading) can be opened directly.
+    if (doc.previewUrl?.startsWith("blob:")) {
+      window.open(doc.previewUrl, "_blank", "noopener");
+      return;
+    }
+    if (!doc.documentId) return;
+    try {
+      const url = await fetchBlobUrl(`/upload/${doc.documentId}/file`);
+      window.open(url, "_blank", "noopener");
+      // Left alive briefly so the new tab can read it, then reclaimed.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      toast.error("Couldn't open that document", {
+        description: "It may have been removed, or it belongs to another account.",
+      });
+    }
+  }, [doc.previewUrl, doc.documentId]);
   const Icon = isPdf ? FileText : FileImage;
   const extraction = doc.extraction?.extraction ?? null;
   const acceptedCount = extraction?.fields_accepted ?? 0;
@@ -114,10 +182,10 @@ export function DocumentCard({
     >
       {/* Header row */}
       <div className="flex items-start gap-3 p-4">
-        {doc.previewUrl && !isPdf ? (
+        {preview && !isPdf ? (
           /* eslint-disable-next-line @next/next/no-img-element -- backend file URL / blob:, next/image can't optimize these */
           <img
-            src={doc.previewUrl}
+            src={preview}
             alt={`Preview of ${doc.filename}`}
             className="size-12 shrink-0 rounded-lg border border-border object-cover"
           />
@@ -136,6 +204,7 @@ export function DocumentCard({
           </p>
           {/* Status chips — always visible, wrap on small screens. */}
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {doc.isPrimary && <Badge variant="default">Primary form</Badge>}
             {doc.docType && (
               <Badge
                 variant={doc.docType.kind === "unknown" ? "outline" : "accent"}
@@ -148,31 +217,45 @@ export function DocumentCard({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
-          {doc.previewUrl && (
+          {(doc.documentId || doc.previewUrl) && (
             <Button
               variant="ghost"
               size="icon"
               className="size-8 text-muted-foreground"
               aria-label={`View ${doc.filename}`}
               title="View document"
-              asChild
+              onClick={() => void openDocument()}
             >
-              <a href={doc.previewUrl} target="_blank" rel="noreferrer">
-                <Eye className="size-4" />
-              </a>
+              <Eye className="size-4" />
             </Button>
           )}
-          {doc.documentId && doc.phase !== "uploading" && (
+          {/* Rejected files were never stored, so this dismisses the card
+              locally rather than deleting a document that doesn't exist. */}
+          {doc.phase === "rejected" ? (
             <Button
               variant="ghost"
               size="icon"
-              className="size-8 text-muted-foreground hover:text-destructive"
-              aria-label={`Delete ${doc.filename}`}
-              title="Delete document"
+              className="size-8 text-muted-foreground hover:text-foreground"
+              aria-label={`Dismiss ${doc.filename}`}
+              title="Dismiss"
               onClick={() => onDelete(doc)}
             >
-              <Trash2 className="size-4" />
+              <X className="size-4" />
             </Button>
+          ) : (
+            doc.documentId &&
+            doc.phase !== "uploading" && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 text-muted-foreground hover:text-destructive"
+                aria-label={`Delete ${doc.filename}`}
+                title="Delete document"
+                onClick={() => onDelete(doc)}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            )
           )}
         </div>
       </div>
@@ -207,6 +290,21 @@ export function DocumentCard({
         <p className="px-3.5 pb-3.5 text-xs text-destructive" role="alert">
           {doc.errorMessage}
         </p>
+      )}
+
+      {/* Rejected: wrong slot. Red inline guidance, and the file was NOT
+          kept — nothing from it reached the profile. */}
+      {doc.phase === "rejected" && doc.errorMessage && (
+        <div
+          className="mx-3.5 mb-3.5 flex gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-2.5"
+          role="alert"
+        >
+          <AlertCircle
+            className="mt-px size-3.5 shrink-0 text-destructive"
+            aria-hidden
+          />
+          <p className="text-xs text-destructive">{doc.errorMessage}</p>
+        </div>
       )}
 
       {/* Analyzed: extraction summary + prefill */}
@@ -329,6 +427,7 @@ export function DocumentCard({
         {doc.phase === "processing" && `Reading ${doc.filename}`}
         {doc.phase === "analyzed" && `${doc.filename} analyzed`}
         {doc.phase === "failed" && `${doc.filename} failed`}
+        {doc.phase === "rejected" && `${doc.filename} was not accepted here`}
       </span>
     </motion.div>
   );

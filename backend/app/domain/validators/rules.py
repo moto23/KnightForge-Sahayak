@@ -181,6 +181,37 @@ def validate_name(value: str) -> ValidationResult:
     )
 
 
+# Answers that are grammatically a "name" but cannot be a place. A declaration
+# Place reading "Yes" is what prompted this: the printed form has a YES/NO row
+# a few lines above, and an affirmative reply is close enough to a word that
+# every letters-only rule accepted it.
+_NOT_A_PLACE = {
+    "yes", "no", "y", "n", "true", "false", "ok", "okay", "none", "nil",
+    "na", "n/a", "not applicable", "same", "same as above", "above",
+}
+
+
+def validate_place(value: str) -> ValidationResult:
+    """A town/city name: a real word, never a yes/no answer."""
+    v = _clean(value)
+    if not v:
+        return ValidationResult.ok("No place provided.")
+    if v.lower() in _NOT_A_PLACE:
+        return ValidationResult.fail(
+            "invalid_place",
+            "That looks like an answer to a different question. "
+            "Please give the city or town where you are signing.",
+        )
+    if len(v) < 3:
+        return ValidationResult.fail("invalid_place", "Place name is too short.")
+    if _NAME_RE.match(v):
+        return ValidationResult.ok("Place is valid.", code="valid_place")
+    return ValidationResult.fail(
+        "invalid_place",
+        "Place may only contain letters, spaces, and . ' - characters.",
+    )
+
+
 def validate_date(value: str) -> ValidationResult:
     """A parseable calendar date (DD-MM-YYYY preferred) that is not in the future."""
     v = _clean(value)

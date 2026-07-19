@@ -108,11 +108,17 @@ export type KycSessionContextValue = {
   /** A user answered these fields herself — drop their prefill mark. */
   markUserAnswered: (fieldIds: string[]) => void;
   /**
-   * A source document was deleted: clear every session answer that was
-   * prefilled ONLY from it, then refresh session + progress everywhere.
-   * Returns how many answers were cleared.
+   * A source document was deleted: clear session answers that were prefilled
+   * ONLY from it, then refresh session + progress everywhere.
+   *
+   * `keepFieldIds` protects fields the intelligence pipeline still owns after
+   * its own recompute (another document supports them, or the user answered
+   * them). Returns how many answers were cleared.
    */
-  rollbackPrefill: (documentId: string) => Promise<number>;
+  rollbackPrefill: (
+    documentId: string,
+    keepFieldIds?: string[],
+  ) => Promise<number>;
   /** Delete the backend session and clear local persistence. */
   resetSession: () => Promise<void>;
 };
@@ -140,6 +146,8 @@ export function KycSessionProvider({
   // (see the concurrency note in the file header).
   const sessionIdRef = React.useRef<string | null>(null);
   const prefillMapRef = React.useRef<PrefillProvenance>({});
+  /** In-flight session creation, shared by concurrent ensureSession callers. */
+  const creatingSessionRef = React.useRef<Promise<string> | null>(null);
 
   const storeSessionId = React.useCallback((id: string | null) => {
     sessionIdRef.current = id;
@@ -207,20 +215,32 @@ export function KycSessionProvider({
 
   const ensureSession = React.useCallback(async (): Promise<string> => {
     if (sessionIdRef.current) return sessionIdRef.current;
-    const created = await sessionService.create();
-    const id = created.session.session_id;
-    window.localStorage.setItem(SESSION_KEY, id);
-    storeSessionId(id);
-    setSession(created.session);
-    storePrefillMap({}); // brand-new session — no provenance carries over
-    setError(null);
-    // Fresh progress snapshot (create() doesn't include one).
+    // Uploading several documents at once fires ensureSession concurrently.
+    // Without this in-flight guard every caller sees a null ref and creates
+    // its OWN session, scattering the documents across sessions so the merged
+    // profile only ever sees one of them. All callers share one creation.
+    if (creatingSessionRef.current) return creatingSessionRef.current;
+    creatingSessionRef.current = (async () => {
+      const created = await sessionService.create();
+      const id = created.session.session_id;
+      window.localStorage.setItem(SESSION_KEY, id);
+      storeSessionId(id);
+      setSession(created.session);
+      storePrefillMap({}); // brand-new session — no provenance carries over
+      setError(null);
+      // Fresh progress snapshot (create() doesn't include one).
+      try {
+        setProgress(await sessionService.progress(id));
+      } catch {
+        /* non-fatal — refresh() will retry */
+      }
+      return id;
+    })();
     try {
-      setProgress(await sessionService.progress(id));
-    } catch {
-      /* non-fatal — refresh() will retry */
+      return await creatingSessionRef.current;
+    } finally {
+      creatingSessionRef.current = null;
     }
-    return id;
   }, [storeSessionId, storePrefillMap]);
 
   const adoptSession = React.useCallback(
@@ -282,11 +302,18 @@ export function KycSessionProvider({
   );
 
   const rollbackPrefill = React.useCallback(
-    async (documentId: string): Promise<number> => {
+    async (documentId: string, keepFieldIds: string[] = []): Promise<number> => {
       const id = sessionIdRef.current;
       if (!id) return 0;
+      // `keepFieldIds` are the fields the intelligence pipeline still owns
+      // AFTER its own authoritative recompute — either another document also
+      // supports them, or the user has since answered them. Clearing those
+      // here would be deleting by field name and losing good data, so this
+      // legacy rollback only sweeps up values the pipeline does NOT own
+      // (e.g. the manual "Prefill my form" path).
+      const keep = new Set(keepFieldIds);
       const fieldIds = Object.entries(prefillMapRef.current)
-        .filter(([, docId]) => docId === documentId)
+        .filter(([fieldId, docId]) => docId === documentId && !keep.has(fieldId))
         .map(([fieldId]) => fieldId);
       if (fieldIds.length === 0) return 0;
 

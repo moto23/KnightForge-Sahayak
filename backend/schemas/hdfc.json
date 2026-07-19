@@ -1,27 +1,328 @@
 {
   "id": "hdfc_kyc",
-  "label": "HDFC Bank KYC Form",
+  "label": "HDFC Bank KYC (Resident Individuals)",
   "kind": "kyc_form",
   "markers": {
-    "strong": ["hdfc bank"],
-    "weak": ["hdfc", "kyc", "know your customer", "customer identification", "application form", "customer id"],
-    "min_score": 4
+    "strong": [
+      "hdfc bank",
+      "know your customer (kyc) application form (resident individuals)",
+      "re-kyc form for resident individuals"
+    ],
+    "weak": [
+      "hdfc",
+      "ckyc identifier",
+      "hdfc customer no",
+      "erstwhile hdfc ltd",
+      "prevention of money laundering act",
+      "cersai",
+      "customer profile details",
+      "guardian's customer no",
+      "paste latest passport size",
+      "age proof",
+      "self employed professional",
+      "gross annual income"
+    ],
+    "min_score": 3
   },
+  "required_canonical": [
+    "name",
+    "father_name",
+    "dob",
+    "pan",
+    "address",
+    "city",
+    "state",
+    "pincode",
+    "mobile",
+    "email"
+  ],
+  "required_session_fields": [
+    "mother_name",
+    "declaration_place",
+    "declaration_date"
+  ],
+  "conditional_required": [
+    {
+      "field_id": "nationality_other",
+      "when_field": "nationality",
+      "equals": [
+        "other"
+      ]
+    }
+  ],
   "fields": [
-    {"canonical": "father_name", "labels": ["father's/spouse name", "father's name", "fathers name", "spouse name"]},
-    {"canonical": "name", "labels": ["name of the customer", "customer name", "name of applicant", "applicant name", "full name", "first/sole applicant", "name"]},
-    {"canonical": "dob", "labels": ["date of birth", "dob"]},
-    {"canonical": "gender", "labels": ["gender", "sex"]},
-    {"canonical": "nationality", "labels": ["nationality"]},
-    {"canonical": "pan", "labels": ["pan", "permanent account number", "pan no"], "document_wide": true},
-    {"canonical": "aadhaar", "labels": ["aadhaar", "aadhaar number", "uid"], "document_wide": true},
-    {"canonical": "address", "labels": ["mailing address", "communication address", "correspondence address", "current address", "residential address", "address"]},
-    {"canonical": "city", "labels": ["city/town/village", "city", "town"]},
-    {"canonical": "state", "labels": ["state"]},
-    {"canonical": "pincode", "labels": ["pin code", "pincode", "pin"]},
-    {"canonical": "mobile", "labels": ["mobile no", "mobile number", "mobile"], "document_wide": true},
-    {"canonical": "email", "labels": ["e-mail id", "email id", "e-mail", "email"], "document_wide": true},
-    {"canonical": "income", "labels": ["gross annual income", "annual income", "income range", "income"]},
-    {"canonical": "occupation", "labels": ["occupation type", "occupation", "nature of business"]}
-  ]
+    {
+      "canonical": "name",
+      "labels": [
+        "customer name",
+        "name of the customer",
+        "applicant name",
+        "full name",
+        "name"
+      ]
+    },
+    {
+      "canonical": "father_name",
+      "labels": [
+        "father's name",
+        "fathers name",
+        "father name",
+        "spouse name"
+      ]
+    },
+    {
+      "canonical": "dob",
+      "labels": [
+        "date of birth",
+        "dob"
+      ]
+    },
+    {
+      "canonical": "gender",
+      "labels": [
+        "gender",
+        "sex"
+      ]
+    },
+    {
+      "canonical": "nationality",
+      "labels": [
+        "nationality"
+      ]
+    },
+    {
+      "canonical": "pan",
+      "labels": [
+        "pan number",
+        "pan no",
+        "pan",
+        "permanent account number"
+      ],
+      "document_wide": true
+    },
+    {
+      "canonical": "aadhaar",
+      "labels": [
+        "uid (aadhaar)",
+        "aadhaar card",
+        "aadhaar number",
+        "aadhaar",
+        "uid"
+      ],
+      "document_wide": true
+    },
+    {
+      "canonical": "address",
+      "labels": [
+        "mailing address",
+        "flat no/bldg name",
+        "road name",
+        "communication address",
+        "address"
+      ]
+    },
+    {
+      "canonical": "city",
+      "labels": [
+        "city",
+        "town"
+      ]
+    },
+    {
+      "canonical": "state",
+      "labels": [
+        "state"
+      ]
+    },
+    {
+      "canonical": "pincode",
+      "labels": [
+        "pin code",
+        "pincode",
+        "pin"
+      ]
+    },
+    {
+      "canonical": "mobile",
+      "labels": [
+        "mobile number",
+        "mobile no",
+        "mobile"
+      ],
+      "document_wide": true
+    },
+    {
+      "canonical": "email",
+      "labels": [
+        "email id",
+        "e-mail id",
+        "e-mail",
+        "email"
+      ],
+      "document_wide": true
+    },
+    {
+      "canonical": "income",
+      "labels": [
+        "gross annual income",
+        "annual income",
+        "income"
+      ]
+    },
+    {
+      "canonical": "occupation",
+      "labels": [
+        "occupation"
+      ]
+    },
+    {
+      "extra_key": "customer_id",
+      "extra_label": "Customer ID",
+      "labels": [
+        "customer id"
+      ]
+    },
+    {
+      "extra_key": "account_number",
+      "extra_label": "Account Number",
+      "labels": [
+        "account number",
+        "account no"
+      ],
+      "value_kind": "account_no"
+    },
+    {
+      "extra_key": "maiden_name",
+      "extra_label": "Maiden Name",
+      "labels": [
+        "maiden name"
+      ]
+    },
+    {
+      "extra_key": "spouse_name",
+      "extra_label": "Spouse's Name",
+      "labels": [
+        "spouse's name",
+        "spouses name"
+      ]
+    },
+    {
+      "extra_key": "marital_status",
+      "extra_label": "Marital Status",
+      "labels": [
+        "marital status"
+      ]
+    },
+    {
+      "extra_key": "landmark",
+      "extra_label": "Landmark",
+      "labels": [
+        "landmark"
+      ]
+    },
+    {
+      "extra_key": "country",
+      "extra_label": "Country",
+      "labels": [
+        "country"
+      ]
+    },
+    {
+      "extra_key": "permanent_address",
+      "extra_label": "Permanent Address",
+      "labels": [
+        "permanent address"
+      ]
+    },
+    {
+      "extra_key": "residence_type",
+      "extra_label": "Residence Type",
+      "labels": [
+        "residence type"
+      ]
+    },
+    {
+      "extra_key": "source_of_funds",
+      "extra_label": "Source of Funds",
+      "labels": [
+        "source of funds"
+      ]
+    },
+    {
+      "extra_key": "nature_of_business",
+      "extra_label": "Nature of Business",
+      "labels": [
+        "nature of business"
+      ]
+    },
+    {
+      "extra_key": "date_of_incorporation",
+      "extra_label": "Date of Incorporation",
+      "labels": [
+        "date of incorporation"
+      ],
+      "value_kind": "date"
+    },
+    {
+      "extra_key": "identification_type",
+      "extra_label": "Identification Type",
+      "labels": [
+        "identification type"
+      ]
+    },
+    {
+      "extra_key": "identification_number",
+      "extra_label": "Identification Number",
+      "labels": [
+        "identification number"
+      ]
+    },
+    {
+      "extra_key": "residential_status",
+      "extra_label": "Residential Status",
+      "labels": [
+        "residential status"
+      ]
+    },
+    {
+      "extra_key": "tax_identification_number",
+      "extra_label": "Tax Identification Number (TIN)",
+      "labels": [
+        "tax identification number",
+        "tin"
+      ]
+    },
+    {
+      "extra_key": "city_of_birth",
+      "extra_label": "City of Birth",
+      "labels": [
+        "city of birth"
+      ]
+    },
+    {
+      "extra_key": "branch_code",
+      "extra_label": "Branch Code",
+      "labels": [
+        "branch code"
+      ]
+    },
+    {
+      "extra_key": "telephone_residence",
+      "extra_label": "Tel (R)",
+      "labels": [
+        "tel. (r)",
+        "tel (r)"
+      ]
+    },
+    {
+      "extra_key": "telephone_office",
+      "extra_label": "Tel (O)",
+      "labels": [
+        "tel. (o)",
+        "tel (o)"
+      ]
+    }
+  ],
+  "requires_photo": true,
+  "requires_signature": true
 }

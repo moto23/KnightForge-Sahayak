@@ -17,7 +17,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.exceptions import AuthRequiredError
+from app.core.exceptions import AuthRequiredError, DocumentNotFoundError
 from app.core.security import decode_access_token
 from app.infrastructure.db import get_db
 from app.infrastructure.db.models import User
@@ -32,6 +32,9 @@ from app.infrastructure.ocr.tesseract_ocr_provider import TesseractOCRProvider
 from app.infrastructure.pdf.coordinate_overlay_pdf_generator import (
     CoordinateOverlayPDFGenerator,
 )
+from app.infrastructure.repositories.in_memory_asset_repository import (
+    InMemorySessionAssetRepository,
+)
 from app.infrastructure.repositories.in_memory_conversation_repository import (
     InMemoryConversationRepository,
 )
@@ -44,14 +47,18 @@ from app.infrastructure.repositories.in_memory_generated_pdf_repository import (
 from app.infrastructure.repositories.in_memory_profile_repository import (
     InMemoryProfileRepository,
 )
-from app.infrastructure.repositories.in_memory_session_repository import (
-    InMemorySessionRepository,
+from app.infrastructure.repositories.sqlite_workflow_repositories import (
+    SqliteDocumentRepository,
+    SqliteGeneratedPdfRepository,
+    SqliteProfileRepository,
+    SqliteSessionRepository,
 )
 from app.infrastructure.repositories.in_memory_understanding_repository import (
     InMemoryDocumentUnderstandingRepository,
 )
 from app.infrastructure.storage.local_storage_adapter import LocalStorageAdapter
 from app.services.ai_service import AIService
+from app.services.asset_service import AssetService
 from app.services.auth_service import AuthService
 from app.services.chat_service import ChatService
 from app.services.conflict_service import conflict_service
@@ -60,6 +67,9 @@ from app.services.coordinate_mapper import CoordinateMapper
 from app.services.document_analysis_service import DocumentAnalysisService
 from app.services.document_classifier import document_classifier
 from app.services.document_intelligence_service import DocumentIntelligenceService
+from app.infrastructure.pdf.form_placement_engine import form_placement_engine
+from app.infrastructure.pdf.json_layout_source import filesystem_layout_source
+from app.services.primary_form_extractor import primary_form_extractor
 from app.services.semantic_extractor import SemanticExtractorService
 from app.services.document_understanding_service import DocumentUnderstandingService
 from app.services.field_mapper import field_mapper
@@ -83,9 +93,10 @@ from app.services.upload_service import UploadService
 # Singletons composed once at import time. The repositories MUST be single
 # shared instances — they hold all live sessions/transcripts in memory.
 # --------------------------------------------------------------------------- #
-_session_repository = InMemorySessionRepository()
+# Persistent: a restart must not destroy a KYC workflow (Phase 19).
+_session_repository = SqliteSessionRepository()
 _conversation_repository = InMemoryConversationRepository()
-_document_repository = InMemoryDocumentRepository()
+_document_repository = SqliteDocumentRepository()
 _file_storage = LocalStorageAdapter(root=settings.UPLOAD_DIR)
 session_service = SessionService(repository=_session_repository)
 interview_service = InterviewService(sessions=session_service)
@@ -125,13 +136,10 @@ document_understanding_service = DocumentUnderstandingService(
 # external JSON map — never in Python.
 # --------------------------------------------------------------------------- #
 _pdf_generator = CoordinateOverlayPDFGenerator()
-_generated_pdf_repository = InMemoryGeneratedPdfRepository()
-pdf_generation_service = PDFGenerationService(
-    sessions=session_service,
-    mapper=CoordinateMapper(map_path=settings.PDF_COORDINATE_MAP_PATH),
-    generator=_pdf_generator,
-    repository=_generated_pdf_repository,
-)
+_generated_pdf_repository = SqliteGeneratedPdfRepository()
+_coordinate_mapper = CoordinateMapper(map_path=settings.PDF_COORDINATE_MAP_PATH)
+# PDFGenerationService is composed AFTER document_intelligence_service below:
+# completing the user's own uploaded form needs that service to locate it.
 
 
 # --------------------------------------------------------------------------- #
@@ -165,8 +173,13 @@ knowledge_service = KnowledgeService(
 # adding a new bank's form is a new JSON file, never new wiring or new code.
 # --------------------------------------------------------------------------- #
 _schema_source = FileSystemSchemaSource()
-_profile_repository = InMemoryProfileRepository()
+_profile_repository = SqliteProfileRepository()
 semantic_extractor_service = SemanticExtractorService(ai=ai_service)
+
+# Declared before the intelligence service because activating a form has to
+# ask "is a photo/signature already stored?" — see _adopt_available_assets.
+# A plain store with no dependencies of its own, so the order is free.
+_asset_repository = InMemorySessionAssetRepository()
 
 document_intelligence_service = DocumentIntelligenceService(
     uploads=upload_service,
@@ -179,7 +192,39 @@ document_intelligence_service = DocumentIntelligenceService(
     sessions=session_service,
     repository=_profile_repository,
     semantic=semantic_extractor_service,  # hybrid: Gemini pass, graceful fallback
+    layouts=filesystem_layout_source,
+    primary_extractor=primary_form_extractor,
+    asset_repository=_asset_repository,
 )
+
+# Phase 15 — form assets. Bytes share the upload FileStorage adapter; the
+# service writes each asset into the session as an ordinary answer, so photo
+# and signature ride the SAME recompute as every other field.
+asset_service = AssetService(
+    repository=_asset_repository,
+    storage=_file_storage,
+    sessions=session_service,
+    intelligence=document_intelligence_service,
+)
+
+# Phase 13: the completed PDF is the user's OWN uploaded form when they gave
+# us one; the bundled coordinate template stays as the fallback.
+pdf_generation_service = PDFGenerationService(
+    sessions=session_service,
+    mapper=_coordinate_mapper,
+    generator=_pdf_generator,
+    repository=_generated_pdf_repository,
+    intelligence=document_intelligence_service,
+    uploads=upload_service,
+    filler=form_placement_engine,
+    assets=asset_service,
+    layouts=filesystem_layout_source,
+)
+
+
+def get_asset_service() -> AssetService:
+    """Provide the shared AssetService (photograph/signature pipeline)."""
+    return asset_service
 
 
 def get_form_service() -> FormService:
@@ -280,6 +325,70 @@ def get_optional_user(
     except Exception:  # expired/garbled token — guest, not an error
         return None
     return db.get(User, user_id)
+
+
+def owned_session(
+    session_id: str,
+    user: User | None = Depends(get_optional_user),
+) -> str:
+    """
+    Authorise access to ONE session's data, returning its id.
+
+    Every session-scoped endpoint takes this in place of a bare `session_id`
+    path parameter, so entitlement is checked server-side on each request
+    rather than assumed from possession of the id. See
+    `SessionService.assert_owner` for the rules.
+    """
+    session_service.assert_owner(session_id, user.id if user else None)
+    return session_id
+
+
+def owned_pdf(
+    pdf_id: str,
+    user: User | None = Depends(get_optional_user),
+) -> str:
+    """
+    Authorise access to ONE generated PDF, returning its id.
+
+    A generated PDF is the most sensitive artefact the product holds — the
+    applicant's PAN, Aadhaar, date of birth, address, photograph and signature
+    rendered onto one page. It carries no owner of its own, but it records the
+    session that produced it, so entitlement is the entitlement to that
+    session. Resolving the record first means an unknown id and someone else's
+    id both end as the same 404.
+    """
+    record = pdf_generation_service.get_record(pdf_id)  # typed 404 when unknown
+    session_service.assert_owner(record.generated_by_session, user.id if user else None)
+    return pdf_id
+
+
+def assert_document_access(document_id: str, user_id: str | None) -> None:
+    """
+    Raise unless `user_id` is entitled to this uploaded document.
+
+    Uploads are the applicant's own KYC form and supporting proofs (PAN card,
+    Aadhaar, driving licence), so the stored file and the text extracted from
+    it are both sensitive. See `UploadedDocument.owner_id` for why a guest
+    upload stays reachable.
+
+    A plain function, not a dependency, because the id does not always arrive
+    in the path: the intelligence endpoints name their document in the request
+    BODY, and both routes must apply the identical rule. Refusal is the same
+    404 an unknown id produces, so probing cannot tell the two apart.
+    """
+    document = upload_service.get_document(document_id)  # typed 404 when unknown
+    owner = getattr(document, "owner_id", None)
+    if owner is not None and owner != user_id:
+        raise DocumentNotFoundError(document_id)
+
+
+def owned_document(
+    document_id: str,
+    user: User | None = Depends(get_optional_user),
+) -> str:
+    """Authorise a path-supplied document id, returning it."""
+    assert_document_access(document_id, user.id if user else None)
+    return document_id
 
 
 def get_current_user(

@@ -1,0 +1,27 @@
+{
+  "id": "address_proof",
+  "label": "Address Proof",
+  "kind": "identity_document",
+  "markers": {
+    "strong": ["proof of address", "address proof", "residence certificate", "domicile certificate", "rent agreement", "lease agreement", "property tax receipt"],
+    "weak": ["landlord", "tenant", "premises", "residing at", "resident of", "municipal", "corporation", "property tax", "assessment", "survey no", "certificate", "issued on", "valid up to", "occupancy"],
+    "min_score": 3
+  },
+  "fields": [
+    {"canonical": "name", "labels": ["name of applicant", "applicant name", "resident name", "tenant name", "customer name", "name"]},
+    {"canonical": "father_name", "labels": ["father's name", "fathers name", "husband's name", "s/o", "d/o", "w/o"]},
+    {"canonical": "address", "labels": ["address of premises", "residential address", "premises address", "residing at", "address"]},
+    {"canonical": "city", "labels": ["city", "town", "village"]},
+    {"canonical": "state", "labels": ["state"]},
+    {"canonical": "pincode", "labels": ["pin code", "pincode", "pin"], "document_wide": true},
+    {"canonical": "mobile", "labels": ["mobile", "contact no", "phone"], "document_wide": true},
+    {"canonical": "email", "labels": ["e-mail", "email"], "document_wide": true},
+    {"canonical": "aadhaar", "labels": ["aadhaar", "uid"], "document_wide": true},
+    {"extra_key": "document_type", "extra_label": "Document Type", "labels": ["document type", "certificate type", "type of document"]},
+    {"extra_key": "reference_number", "extra_label": "Reference Number", "labels": ["reference no", "reference number", "certificate no", "registration no", "consumer no", "application no"]},
+    {"extra_key": "issuing_authority", "extra_label": "Issuing Authority", "labels": ["issuing authority", "issued by", "authority"]},
+    {"extra_key": "issue_date", "extra_label": "Issue Date", "labels": ["issue date", "date of issue", "issued on"], "value_kind": "date"},
+    {"extra_key": "valid_until", "extra_label": "Valid Until", "labels": ["valid up to", "valid until", "validity"], "value_kind": "date"},
+    {"extra_key": "district", "extra_label": "District", "labels": ["district", "taluka", "tehsil"]}
+  ]
+}

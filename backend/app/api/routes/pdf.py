@@ -20,7 +20,15 @@ import logging
 from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 
-from app.core.dependencies import get_pdf_generation_service
+from app.core.dependencies import (
+    get_optional_user,
+    get_pdf_generation_service,
+    get_session_service,
+    owned_pdf,
+)
+from app.core.exceptions import DomainError
+from app.domain.pdf import fingerprint_answers
+from app.infrastructure.db.models import User
 from app.schemas.pdf import (
     DeletePdfResponse,
     GeneratedPdfResponse,
@@ -28,6 +36,7 @@ from app.schemas.pdf import (
     GeneratePdfResponse,
 )
 from app.services.pdf_generation_service import PDFGenerationService
+from app.services.session_service import SessionService
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +63,13 @@ router = APIRouter(prefix="/pdf", tags=["PDF Generation"])
 async def generate_pdf(
     body: GeneratePdfRequest,
     pdfs: PDFGenerationService = Depends(get_pdf_generation_service),
+    sessions: SessionService = Depends(get_session_service),
+    user: User | None = Depends(get_optional_user),
 ) -> GeneratePdfResponse:
     """Generate one filled PDF and return its metadata + download URL."""
+    # The session named in the body decides entitlement: generating a PDF
+    # renders somebody's PAN, Aadhaar, photograph and signature onto a page.
+    sessions.assert_owner(body.session_id, user.id if user else None)
     record = pdfs.generate(body.session_id)
     return GeneratePdfResponse(
         message="PDF generated successfully.",
@@ -67,13 +81,34 @@ async def generate_pdf(
     "",
     response_model=list[GeneratedPdfResponse],
     summary="List all generated PDFs",
-    description="Metadata for every generated PDF, newest first.",
+    description=(
+        "Metadata for every generated PDF, newest first — the immutable "
+        "history. Pass `session_id` to have each record report whether it "
+        "still matches that session's CURRENT answers (`is_current`); records "
+        "themselves are never rewritten."
+    ),
 )
 async def list_pdfs(
+    session_id: str | None = None,
+    user: User | None = Depends(get_optional_user),
     pdfs: PDFGenerationService = Depends(get_pdf_generation_service),
+    sessions: SessionService = Depends(get_session_service),
 ) -> list[GeneratedPdfResponse]:
-    """Return metadata for all generated PDFs."""
-    return [GeneratedPdfResponse.from_domain(r) for r in pdfs.list_records()]
+    """Return metadata for all generated PDFs, flagging the current one."""
+    fingerprint: str | None = None
+    if session_id:
+        try:
+            fingerprint = fingerprint_answers(sessions.get_session(session_id).answers)
+        except DomainError:
+            fingerprint = None  # unknown session: everything is simply history
+    # History is per-user: without this filter the list handed every caller
+    # the metadata of every PDF the deployment had ever produced.
+    user_id = user.id if user else None
+    return [
+        GeneratedPdfResponse.from_domain(r, fingerprint)
+        for r in pdfs.list_records()
+        if sessions.may_access(r.generated_by_session, user_id)
+    ]
 
 
 @router.get(
@@ -83,7 +118,7 @@ async def list_pdfs(
     responses={404: {"description": "Generated PDF not found."}},
 )
 async def get_pdf(
-    pdf_id: str,
+    pdf_id: str = Depends(owned_pdf),
     pdfs: PDFGenerationService = Depends(get_pdf_generation_service),
 ) -> GeneratedPdfResponse:
     """Return the metadata record for one generated PDF."""
@@ -100,7 +135,7 @@ async def get_pdf(
     },
 )
 async def download_pdf(
-    pdf_id: str,
+    pdf_id: str = Depends(owned_pdf),
     pdfs: PDFGenerationService = Depends(get_pdf_generation_service),
 ) -> FileResponse:
     """Stream the generated PDF as a file download."""
@@ -120,7 +155,7 @@ async def download_pdf(
     responses={404: {"description": "Generated PDF not found."}},
 )
 async def delete_pdf(
-    pdf_id: str,
+    pdf_id: str = Depends(owned_pdf),
     pdfs: PDFGenerationService = Depends(get_pdf_generation_service),
 ) -> DeletePdfResponse:
     """Delete one generated PDF (file + metadata)."""

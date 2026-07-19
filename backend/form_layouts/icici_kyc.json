@@ -1,0 +1,285 @@
+{
+  "form_id": "icici_kyc",
+  "label": "ICICI Central KYC Registry Form (Individual)",
+  "has_text_layer": true,
+  "excluded_widget_patterns": [
+    "branch",
+    "employee",
+    "emp_",
+    "official",
+    "institution",
+    "attestation",
+    "acknowle"
+  ],
+  "excluded_regions": [
+    [1, { "x0": 0, "y0": 625, "x1": 595, "y1": 842 }],
+    [2, { "x0": 0, "y0": 0, "x1": 595, "y1": 842 }]
+  ],
+  "fields": {
+    "ckycr_number": {
+      "page": 0,
+      "mode": "comb",
+      "cells": 14,
+      "rect": { "x0": 182.0, "y0": 171.3, "x1": 335.6, "y1": 182.3 }
+    },
+    "application_type": {
+      "page": 0,
+      "mode": "check",
+      "tick_check_mark": true,
+      "option_rects": {
+        "new": { "x0": 192.6, "y0": 158.3, "x1": 199.6, "y1": 165.3 },
+        "update": { "x0": 223.4, "y0": 158.3, "x1": 230.4, "y1": 165.3 }
+      }
+    },
+    "address_type": {
+      "page": 0,
+      "mode": "check",
+      "tick_check_mark": true,
+      "option_rects": {
+        "residential_business": { "x0": 97.5, "y0": 704.3, "x1": 104.5, "y1": 711.3 },
+        "residential": { "x0": 224.6, "y0": 704.3, "x1": 231.6, "y1": 711.3 },
+        "business": { "x0": 324.7, "y0": 704.3, "x1": 331.7, "y1": 711.3 },
+        "registered_office": { "x0": 410.7, "y0": 704.3, "x1": 417.7, "y1": 711.3 },
+        "unspecified": { "x0": 522.8, "y0": 704.3, "x1": 529.8, "y1": 711.3 }
+      }
+    },
+    "correspondence_same_as_permanent": {
+      "page": 1,
+      "mode": "check",
+      "tick_check_mark": true,
+      "option_rects": {
+        "yes": { "x0": 16.6, "y0": 47.6, "x1": 23.6, "y1": 54.6 }
+      }
+    },
+    "full_name": {
+      "page": 0,
+      "name_segments": {
+        "cells": 12,
+        "first": { "x0": 164.3, "y0": 227.3, "x1": 296.3, "y1": 238.3 },
+        "middle": { "x0": 307.3, "y0": 227.3, "x1": 439.2, "y1": 238.3 },
+        "last": { "x0": 450.2, "y0": 227.3, "x1": 581.8, "y1": 238.3 }
+      }
+    },
+    "father_spouse_name": {
+      "page": 0,
+      "name_segments": {
+        "cells": 12,
+        "first": { "x0": 164.3, "y0": 255.1, "x1": 296.3, "y1": 266.1 },
+        "middle": { "x0": 307.3, "y0": 255.1, "x1": 439.2, "y1": 266.1 },
+        "last": { "x0": 450.2, "y0": 255.1, "x1": 581.8, "y1": 266.1 }
+      }
+    },
+    "mother_name": {
+      "page": 0,
+      "name_segments": {
+        "cells": 12,
+        "first": { "x0": 164.3, "y0": 269.1, "x1": 296.3, "y1": 280.1 },
+        "middle": { "x0": 307.3, "y0": 269.1, "x1": 439.2, "y1": 280.1 },
+        "last": { "x0": 450.2, "y0": 269.1, "x1": 581.8, "y1": 280.1 }
+      }
+    },
+    "date_of_birth": {
+      "page": 0,
+      "mode": "comb",
+      "cells": 10,
+      "date_format": "DD MM YYYY",
+      "strip_separators": false,
+      "rect": { "x0": 120.5, "y0": 283.7, "x1": 230.1, "y1": 294.7 }
+    },
+    "gender": {
+      "page": 0,
+      "mode": "check",
+      "option_rects": {
+        "male": { "x0": 120.7, "y0": 300.1, "x1": 127.7, "y1": 307.1 },
+        "female": { "x0": 262.7, "y0": 300.0, "x1": 269.7, "y1": 307.0 }
+      }
+    },
+    "marital_status": {
+      "page": 0,
+      "mode": "check",
+      "option_rects": {
+        "married": { "x0": 120.7, "y0": 314.7, "x1": 127.7, "y1": 321.7 },
+        "single": { "x0": 263.0, "y0": 314.7, "x1": 270.0, "y1": 321.7 }
+      }
+    },
+    "nationality": {
+      "page": 0,
+      "mode": "check",
+      "option_rects": {
+        "indian": { "x0": 120.7, "y0": 329.1, "x1": 127.7, "y1": 336.1 },
+        "other": { "x0": 263.1, "y0": 328.9, "x1": 270.1, "y1": 335.9 }
+      }
+    },
+    "residential_status": {
+      "page": 0,
+      "mode": "check",
+      "option_rects": {
+        "resident_individual": { "x0": 120.6, "y0": 346.3, "x1": 127.6, "y1": 353.3 },
+        "non_resident": { "x0": 262.9, "y0": 346.3, "x1": 269.9, "y1": 353.3 },
+        "foreign_national": { "x0": 120.6, "y0": 357.0, "x1": 127.6, "y1": 364.0 }
+      }
+    },
+    "occupation": {
+      "page": 0,
+      "mode": "check",
+      "option_rects": {
+        "private_sector": [
+          { "x0": 120.7, "y0": 373.1, "x1": 127.7, "y1": 380.1 },
+          { "x0": 180.6, "y0": 373.1, "x1": 187.6, "y1": 380.1 }
+        ],
+        "public_sector": [
+          { "x0": 120.7, "y0": 373.1, "x1": 127.7, "y1": 380.1 },
+          { "x0": 263.0, "y0": 373.5, "x1": 270.0, "y1": 380.5 }
+        ],
+        "government_service": [
+          { "x0": 120.7, "y0": 373.1, "x1": 127.7, "y1": 380.1 },
+          { "x0": 338.9, "y0": 373.6, "x1": 345.9, "y1": 380.6 }
+        ],
+        "professional": [
+          { "x0": 120.7, "y0": 384.1, "x1": 127.7, "y1": 391.1 },
+          { "x0": 181.0, "y0": 384.4, "x1": 188.0, "y1": 391.4 }
+        ],
+        "retired": [
+          { "x0": 120.7, "y0": 384.1, "x1": 127.7, "y1": 391.1 },
+          { "x0": 338.9, "y0": 384.2, "x1": 345.9, "y1": 391.2 }
+        ],
+        "housewife": [
+          { "x0": 120.7, "y0": 384.1, "x1": 127.7, "y1": 391.1 },
+          { "x0": 386.9, "y0": 384.3, "x1": 393.9, "y1": 391.3 }
+        ],
+        "student": [
+          { "x0": 120.7, "y0": 384.1, "x1": 127.7, "y1": 391.1 },
+          { "x0": 447.0, "y0": 384.3, "x1": 454.0, "y1": 391.3 }
+        ],
+        "business": { "x0": 120.7, "y0": 395.1, "x1": 127.7, "y1": 402.1 }
+      }
+    },
+    "poi_document": {
+      "page": 0,
+      "mode": "check",
+      "option_rects": {
+        "passport": { "x0": 12.6, "y0": 540.1, "x1": 19.6, "y1": 547.1 },
+        "voter_id": { "x0": 12.6, "y0": 554.1, "x1": 19.6, "y1": 561.1 },
+        "driving_licence": { "x0": 12.6, "y0": 583.2, "x1": 19.6, "y1": 590.2 },
+        "uid_aadhaar": { "x0": 12.6, "y0": 598.2, "x1": 19.6, "y1": 605.2 },
+        "others": { "x0": 12.6, "y0": 628.2, "x1": 19.6, "y1": 635.2 }
+      }
+    },
+    "pan": {
+      "page": 0,
+      "mode": "comb",
+      "cells": 10,
+      "rect": { "x0": 120.5, "y0": 567.8, "x1": 230.1, "y1": 578.8 }
+    },
+    "aadhaar": {
+      "page": 0,
+      "mode": "comb",
+      "cells": 12,
+      "rect": { "x0": 120.5, "y0": 595.8, "x1": 252.1, "y1": 606.8 }
+    },
+    "poa_document": {
+      "page": 0,
+      "mode": "check",
+      "tick_check_mark": true,
+      "option_rects": {
+        "passport": { "x0": 97.5, "y0": 718.3, "x1": 104.5, "y1": 725.3 },
+        "driving_licence": { "x0": 224.6, "y0": 718.3, "x1": 231.6, "y1": 725.3 },
+        "voter_id": { "x0": 97.5, "y0": 728.3, "x1": 104.5, "y1": 735.3 },
+        "others": { "x0": 324.7, "y0": 728.3, "x1": 331.7, "y1": 735.3 }
+      }
+    },
+    "correspondence_address": {
+      "page": 0,
+      "mode": "comb",
+      "cells": 47,
+      "strip_separators": false,
+      "rect": { "x0": 62.3, "y0": 758.0, "x1": 578.6, "y1": 769.0 }
+    },
+    "city": {
+      "page": 0,
+      "mode": "comb",
+      "cells": 10,
+      "strip_separators": false,
+      "rect": { "x0": 468.7, "y0": 784.0, "x1": 578.5, "y1": 795.0 }
+    },
+    "pincode": {
+      "page": 0,
+      "mode": "comb",
+      "cells": 6,
+      "rect": { "x0": 260.0, "y0": 796.9, "x1": 325.9, "y1": 807.9 }
+    },
+    "telephone_office": {
+      "page": 1,
+      "mode": "comb",
+      "cells": 8,
+      "rect": { "x0": 120.2, "y0": 229.3, "x1": 208.2, "y1": 240.3 }
+    },
+    "telephone_residence": {
+      "page": 1,
+      "mode": "comb",
+      "cells": 8,
+      "rect": { "x0": 315.4, "y0": 229.3, "x1": 403.3, "y1": 240.3 }
+    },
+    "mobile": {
+      "page": 1,
+      "mode": "comb",
+      "cells": 10,
+      "rect": { "x0": 472.0, "y0": 229.3, "x1": 582.0, "y1": 240.3 }
+    },
+    "email": {
+      "page": 1,
+      "mode": "comb",
+      "cells": 29,
+      "strip_separators": false,
+      "rect": { "x0": 262.3, "y0": 242.4, "x1": 581.5, "y1": 253.4 }
+    },
+    "other_information": {
+      "page": 1,
+      "mode": "comb",
+      "cells": 52,
+      "strip_separators": false,
+      "rect": { "x0": 12.3, "y0": 496.1, "x1": 581.8, "y1": 507.1 }
+    },
+    "declaration_date": {
+      "page": 1,
+      "mode": "comb",
+      "cells": 10,
+      "date_format": "DD MM YYYY",
+      "strip_separators": false,
+      "rect": { "x0": 47.6, "y0": 604.5, "x1": 157.2, "y1": 615.5 }
+    },
+    "declaration_place": {
+      "page": 1,
+      "mode": "comb",
+      "cells": 12,
+      "strip_separators": false,
+      "rect": { "x0": 225.5, "y0": 603.5, "x1": 357.2, "y1": 614.5 }
+    }
+  },
+  "photo": {
+    "page": 0,
+    "rect": { "x0": 498.9, "y0": 303.2, "x1": 582.0, "y1": 390.0 }
+  },
+  "signature": {
+    "page": 1,
+    "rect": { "x0": 420.4, "y0": 562.8, "x1": 581.6, "y1": 603.6 }
+  },
+  "not_on_form": [
+    "district",
+    "state",
+    "country",
+    "nationality_other",
+    "permanent_address",
+    "permanent_pincode",
+    "spouse_name",
+    "account_number",
+    "religion",
+    "category",
+    "monthly_income",
+    "gross_annual_income",
+    "net_worth",
+    "net_worth_date",
+    "is_pep",
+    "is_pep_related"
+  ]
+}

@@ -23,10 +23,15 @@ export const knowledgeService = {
     }),
 
   /** POST /knowledge/query — grounded, cited answer (or an honest IDK). */
-  query: (question: string, topK?: number) =>
+  /**
+   * `sessionId` is the ACTIVE KYC session, when there is one. The backend uses
+   * it to answer "what's left for me?" from that session's own state instead
+   * of from the document corpus. Omitted for guests with no workflow open.
+   */
+  query: (question: string, topK?: number, sessionId?: string | null) =>
     api.post<KnowledgeQueryResponse>(
       "/knowledge/query",
-      { question, top_k: topK ?? null },
+      { question, top_k: topK ?? null, session_id: sessionId ?? null },
       { timeoutMs: QUERY_TIMEOUT_MS },
     ),
 

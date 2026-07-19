@@ -1,27 +1,39 @@
 {
   "id": "axis_kyc",
-  "label": "Axis Bank KYC Form",
+  "label": "Axis Bank KYC Application Form (Central KYC Registry)",
   "kind": "kyc_form",
   "markers": {
-    "strong": ["axis bank"],
-    "weak": ["axis", "kyc", "know your customer", "customer information", "application form", "customer id"],
-    "min_score": 4
+    "strong": [
+      "ck001",
+      "1st joint applicant",
+      "2nd joint applicant",
+      "required if driving license provided as identity/address proof"
+    ],
+    "weak": [
+      "know your customer (kyc) application form for individual",
+      "primary applicant",
+      "joint applicant",
+      "driving license expiry date",
+      "passport expiry date"
+    ],
+    "min_score": 6
   },
+  "required_canonical": ["name", "father_name", "occupation"],
+  "required_session_fields": [
+    "mother_name",
+    "spouse_name",
+    "declaration_place",
+    "declaration_date"
+  ],
+  "conditional_required": [],
   "fields": [
-    {"canonical": "father_name", "labels": ["father's/spouse name", "father's name", "fathers name", "spouse name"]},
-    {"canonical": "name", "labels": ["name of the customer", "customer name", "name of applicant", "applicant name", "full name", "name"]},
-    {"canonical": "dob", "labels": ["date of birth", "dob"]},
-    {"canonical": "gender", "labels": ["gender", "sex"]},
-    {"canonical": "nationality", "labels": ["nationality"]},
-    {"canonical": "pan", "labels": ["pan", "permanent account number", "pan no"], "document_wide": true},
-    {"canonical": "aadhaar", "labels": ["aadhaar", "aadhaar number", "uid"], "document_wide": true},
-    {"canonical": "address", "labels": ["communication address", "correspondence address", "current address", "residential address", "address"]},
-    {"canonical": "city", "labels": ["city/town/village", "city", "town"]},
-    {"canonical": "state", "labels": ["state"]},
-    {"canonical": "pincode", "labels": ["pin code", "pincode", "pin"]},
-    {"canonical": "mobile", "labels": ["mobile no", "mobile number", "mobile"], "document_wide": true},
-    {"canonical": "email", "labels": ["e-mail id", "email id", "e-mail", "email"], "document_wide": true},
-    {"canonical": "income", "labels": ["gross annual income", "annual income", "income range", "income"]},
-    {"canonical": "occupation", "labels": ["occupation type", "occupation", "nature of business"]}
+    {"canonical": "name", "labels": ["name* (same as id proof)", "name (same as id proof)", "name"]},
+    {"canonical": "father_name", "labels": ["father's name", "fathers name"]},
+    {"canonical": "occupation", "labels": ["occupation type", "occupation"]},
+    {"extra_key": "mother_name", "extra_label": "Mother's Name", "labels": ["mother's name", "mothers name"]},
+    {"extra_key": "spouse_name", "extra_label": "Spouse's Name", "labels": ["spouse name", "spouse's name"]},
+    {"extra_key": "maiden_name", "extra_label": "Maiden Name", "labels": ["maiden name"]},
+    {"extra_key": "passport_expiry", "extra_label": "Passport Expiry Date", "labels": ["passport expiry date"]},
+    {"extra_key": "driving_licence_expiry", "extra_label": "Driving Licence Expiry Date", "labels": ["driving license expiry date", "driving licence expiry date"]}
   ]
 }

@@ -12,6 +12,7 @@
  *   pdf.ts           /pdf     (generate, list, get, delete, download URL)
  *   knowledge.ts     /knowledge (index, query, status) — Phase 10 RAG
  *   intelligence.ts  /intelligence (process, profile, resolve) — Phase 11
+ *   assets.ts        /assets  (photograph + signature, when the form needs them)
  *   auth.ts          /auth (register, login, refresh, logout, google) — Phase 12
  *   chats.ts         /chats (saved conversations + messages) — Phase 12
  *
@@ -26,5 +27,6 @@ export { conversationService } from "@/services/conversation";
 export { pdfService } from "@/services/pdf";
 export { knowledgeService } from "@/services/knowledge";
 export { intelligenceService } from "@/services/intelligence";
+export { assetsService } from "@/services/assets";
 export { authService } from "@/services/auth";
 export { chatsService } from "@/services/chats";

@@ -147,3 +147,68 @@ class ChatMessage(Base):
 
 # Search + listing hit these together constantly.
 Index("ix_chat_messages_convo_created", ChatMessage.conversation_id, ChatMessage.created_at)
+
+
+# --------------------------------------------------------------------------- #
+# Workflow state (Phase 19 persistence).
+#
+# These four tables exist so a backend restart does not destroy a KYC workflow.
+# Everything below used to live in process memory, which meant every code
+# reload wiped the session, its documents, its merged profile and its generated
+# PDFs — the frontend then found a dead session id, discarded it, and started a
+# fresh one that fell back to the default form scope ("0%, 21 required
+# fields").
+#
+# The domain objects are pydantic models, so each row stores the object as JSON
+# in `data_json` alongside the few columns that must be QUERYABLE (owner, and
+# the session a PDF belongs to, both used by the ownership checks). Keeping the
+# payload opaque means no field-by-field mapping to drift out of sync with the
+# domain, and adding a domain field later needs no migration.
+# --------------------------------------------------------------------------- #
+
+
+class SessionRecord(Base):
+    """One interview session, owner included (NULL = guest)."""
+
+    __tablename__ = "kyc_sessions"
+
+    session_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    owner_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    data_json: Mapped[str] = mapped_column(Text, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )
+
+
+class DocumentRecord(Base):
+    """Uploaded-document METADATA. Bytes stay with the FileStorage adapter."""
+
+    __tablename__ = "kyc_documents"
+
+    document_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    owner_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    data_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class ProfileRecord(Base):
+    """The merged canonical profile + evidence for one session."""
+
+    __tablename__ = "kyc_profiles"
+
+    session_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    data_json: Mapped[str] = mapped_column(Text, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )
+
+
+class GeneratedPdfRecord(Base):
+    """Generated-PDF metadata; `session_id` is what its ownership resolves through."""
+
+    __tablename__ = "kyc_generated_pdfs"
+
+    pdf_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    data_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

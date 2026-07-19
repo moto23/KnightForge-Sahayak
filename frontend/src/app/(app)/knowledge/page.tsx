@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/auth-context";
 import { toApiError } from "@/services/api-client";
 import { chatsService, knowledgeService } from "@/services";
+import { useKycSession } from "@/hooks/use-kyc-session";
 import type {
   ChatMessage,
   KnowledgeCitation,
@@ -74,6 +75,10 @@ const SUGGESTED_QUESTIONS = [
  */
 export default function KnowledgePage() {
   const { isAuthenticated, restoring } = useAuth();
+  // The ACTIVE KYC session, read only. Sent with each question so
+  // "what's left for me?" is answered from real state. Never
+  // ensureSession() — asking a question must not start a workflow.
+  const { sessionId } = useKycSession();
   const [status, setStatus] = React.useState<KnowledgeStatusResponse | null>(null);
   const [phase, setPhase] = React.useState<"booting" | "ready" | "error">("booting");
   const [bootError, setBootError] = React.useState("");
@@ -225,12 +230,12 @@ React.useEffect(() => {
           chatId = created.chat_id;
           setActiveChatId(chatId);
         }
-        const turn = await chatsService.ask(chatId, content);
+        const turn = await chatsService.ask(chatId, content, sessionId);
         setMessages((prev) => [...prev, fromPersisted(turn.assistant_message)]);
         setHistoryKey((k) => k + 1); // titles/ordering changed
       } else {
         // Guest path: exactly the Phase 10 behavior — nothing saved.
-        const reply = await knowledgeService.query(content);
+        const reply = await knowledgeService.query(content, undefined, sessionId);
         setMessages((prev) => [
           ...prev,
           {
@@ -320,7 +325,7 @@ React.useEffect(() => {
           <div className="flex flex-1 items-center justify-center p-6">
             <EmptyState
               title="The knowledge base is empty"
-              description="Build the vector index from the official KYC documents once — after that, every question is answered locally with citations."
+              description="Index the trusted KYC reference documents once — after that, every answer is grounded in them and comes with citations you can check."
               action={
                 <Button variant="gradient" disabled={indexing} onClick={() => void buildIndex()}>
                   {indexing ? (

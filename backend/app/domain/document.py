@@ -25,6 +25,19 @@ class UploadedDocument(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     document_id: str = Field(..., description="Server-generated UUID identifying the document.")
+    owner_id: str | None = Field(
+        default=None,
+        description=(
+            "Id of the signed-in user who uploaded this, or None for a "
+            "guest upload.\n\n"
+            "An upload is the applicant's own KYC form or a supporting "
+            "proof (PAN card, Aadhaar, driving licence); both the stored "
+            "file and the text extracted from it are sensitive. Ownership "
+            "is recorded so a document_id in a URL is not by itself "
+            "authority to read, download or delete it. None keeps guest "
+            "uploads working exactly as before."
+        ),
+    )
     original_filename: str = Field(
         ..., description="Client-supplied filename — display metadata only, never trusted."
     )

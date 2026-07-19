@@ -1,9 +1,11 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, PencilLine, UploadCloud } from "lucide-react";
 
+import { AssetUploadCard } from "@/components/assets/asset-upload-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { ProgressCard } from "@/components/shared/progress-card";
 import { EmptyState, ErrorState, LoadingAnimation } from "@/components/shared/states";
@@ -16,9 +18,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useAsync } from "@/hooks/use-async";
 import { useKycSession } from "@/hooks/use-kyc-session";
 import { fadeUp, staggerContainer } from "@/lib/motion";
-import type { KYCField } from "@/types/api";
+import { assetsService } from "@/services";
+import type { AssetRequirement, KYCField } from "@/types/api";
 
 type FieldRow = {
   field: KYCField;
@@ -26,6 +30,13 @@ type FieldRow = {
   value?: string;
   errorMessage?: string;
 };
+
+/**
+ * Image fields are in the schema like any other, but a row showing the raw
+ * asset id is meaningless. They are pulled out of the normal listing and shown
+ * as upload cards instead — and only when the active form requires them.
+ */
+const ASSET_FIELD_IDS = new Set(["applicant_photo", "applicant_signature"]);
 
 /**
  * Progress Dashboard (Phase 9B.1 — fully integrated).
@@ -36,6 +47,30 @@ type FieldRow = {
 export default function ProgressPage() {
   const { session, progress, schema, prefilledIds, restoring, error, refresh } =
     useKycSession();
+  const sessionId = session?.session_id ?? null;
+
+  /**
+   * What the active form requires. Empty unless a form asks for an image, and
+   * a failure is silent — assets are a conditional extra, so a session with no
+   * primary form simply shows nothing rather than an error.
+   */
+  const assetState = useAsync(
+    (signal) =>
+      sessionId
+        ? assetsService
+            .requirements(sessionId, signal)
+            .then((r) => r.requirements)
+            .catch(() => [] as AssetRequirement[])
+        : Promise.resolve([] as AssetRequirement[]),
+    [sessionId],
+  );
+
+  const onAssetChanged = React.useCallback(async () => {
+    assetState.reload();
+    await refresh();
+  }, [assetState, refresh]);
+
+  const requiredAssets = (assetState.data ?? []).filter((r) => r.required);
 
   if (restoring) {
     return <LoadingAnimation label="Loading your progress…" className="min-h-[50dvh]" />;
@@ -103,7 +138,9 @@ export default function ProgressPage() {
 
   const sections = schema.sections.map((section) => ({
     section,
-    rows: section.fields.map(statusOf),
+    rows: section.fields
+      .filter((f) => !ASSET_FIELD_IDS.has(f.id))
+      .map(statusOf),
   }));
 
   const allRows = sections.flatMap((s) => s.rows);
@@ -162,6 +199,33 @@ export default function ProgressPage() {
           </p>
         </Card>
       </div>
+
+      {/* Photo / signature — shown ONLY when the active form requires them,
+          so a form with no photo box never displays an empty photo slot. */}
+      {sessionId && requiredAssets.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle>Photograph &amp; signature</CardTitle>
+            <CardDescription>
+              Your form has a place for {requiredAssets.length === 2
+                ? "both of these"
+                : "this"}
+              . {requiredAssets.filter((r) => r.provided).length} of{" "}
+              {requiredAssets.length} supplied.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            {requiredAssets.map((requirement) => (
+              <AssetUploadCard
+                key={requirement.kind}
+                sessionId={sessionId}
+                requirement={requirement}
+                onChanged={onAssetChanged}
+              />
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Field sections (from the real schema) */}
       <motion.div

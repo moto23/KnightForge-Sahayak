@@ -1,18 +1,83 @@
 """Pydantic request/response DTOs for the /auth endpoints (Phase 12)."""
 
+import re
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.infrastructure.db.models import User
+
+# --------------------------------------------------------------------------- #
+# Password policy — the SINGLE definition, mirrored verbatim by the sign-in
+# form in frontend/src/app/signin/page.tsx.
+#
+# The two MUST agree. When they drifted (frontend min 8, backend min 8 with no
+# character-class rules) the failure mode was silent: a password the form
+# happily accepted could still be refused by the API, and the user was shown a
+# generic "could not create the account". Every rule below is therefore stated
+# once, checked here, and re-stated identically in the client so the inline
+# error appears before the request is ever sent.
+# --------------------------------------------------------------------------- #
+
+PASSWORD_MIN_LENGTH = 6
+PASSWORD_MAX_LENGTH = 128
+
+_PASSWORD_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"[a-z]"), "one lowercase letter"),
+    (re.compile(r"[A-Z]"), "one uppercase letter"),
+    (re.compile(r"[0-9]"), "one number"),
+    (re.compile(r"[^A-Za-z0-9]"), "one special character"),
+)
+
+
+def validate_password(value: str) -> str:
+    """
+    Enforce the shared password policy.
+
+    Reports EVERY unmet rule at once rather than the first one, so a user is
+    not sent round the loop four times. The password itself is never logged or
+    echoed back — only the names of the rules it failed.
+    """
+    if len(value) < PASSWORD_MIN_LENGTH:
+        raise ValueError(
+            f"Password must be at least {PASSWORD_MIN_LENGTH} characters."
+        )
+    missing = [name for pattern, name in _PASSWORD_RULES if not pattern.search(value)]
+    if missing:
+        raise ValueError("Password must contain at least " + ", ".join(missing) + ".")
+    return value
 
 
 class RegisterRequest(BaseModel):
     """Body of POST /auth/register."""
 
     email: EmailStr = Field(..., description="Account email (unique).")
-    password: str = Field(..., min_length=8, max_length=128, description="At least 8 chars.")
-    full_name: str = Field(default="", max_length=120, description="Display name.")
+    password: str = Field(
+        ...,
+        min_length=PASSWORD_MIN_LENGTH,
+        max_length=PASSWORD_MAX_LENGTH,
+        description=(
+            f"At least {PASSWORD_MIN_LENGTH} characters, including an uppercase "
+            "letter, a lowercase letter, a number and a special character."
+        ),
+    )
+    full_name: str = Field(
+        ..., min_length=1, max_length=120, description="Display name (required)."
+    )
+
+    @field_validator("password")
+    @classmethod
+    def _check_password(cls, value: str) -> str:
+        return validate_password(value)
+
+    @field_validator("full_name")
+    @classmethod
+    def _check_name(cls, value: str) -> str:
+        """Trim, and reject a whitespace-only name (which is not a name)."""
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("Please enter your name.")
+        return trimmed
 
 
 class LoginRequest(BaseModel):
@@ -26,6 +91,15 @@ class UpdateProfileRequest(BaseModel):
     """Body of PATCH /auth/me."""
 
     full_name: str = Field(..., min_length=1, max_length=120, description="New display name.")
+
+    @field_validator("full_name")
+    @classmethod
+    def _check_name(cls, value: str) -> str:
+        """Same rule as registration: a name of only spaces is not a name."""
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("Please enter your name.")
+        return trimmed
 
 
 class UserResponse(BaseModel):

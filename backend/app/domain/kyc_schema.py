@@ -303,11 +303,18 @@ _ADDRESS_FIELDS: tuple[KYCField, ...] = (
         ),
         example="Passport",
         options=_opts(
+            # The six OVDs every KRA form lists first, then the utility-bill
+            # style proofs the CVL guidelines allow. Aadhaar / NREGA / NPR were
+            # missing, so a CVL applicant had no way to name the document their
+            # own form prints on its first three lines.
+            ("aadhaar", "Aadhaar Card"),
             ("passport", "Passport"),
+            ("voter_id", "Voter Identity Card"),
+            ("driving_licence", "Driving Licence"),
+            ("nrega_job_card", "NREGA Job Card"),
+            ("npr_letter", "NPR Letter"),
             ("ration_card", "Ration Card"),
             ("registered_lease", "Registered Lease / Sale Agreement of Residence"),
-            ("driving_licence", "Driving Licence"),
-            ("voter_id", "Voter Identity Card"),
             ("bank_statement", "Latest Bank A/c Statement / Passbook"),
             ("telephone_bill", "Latest Telephone Bill (only Land Line)"),
             ("electricity_bill", "Latest Electricity Bill"),
@@ -468,6 +475,34 @@ _OTHER_FIELDS: tuple[KYCField, ...] = (
 # --------------------------------------------------------------------------- #
 
 _DECLARATION_FIELDS: tuple[KYCField, ...] = (
+    # Image assets. Both are required=False HERE on purpose: only the ACTIVE
+    # primary form decides whether they are needed, by adding their ids to the
+    # session's required set (see DocumentIntelligenceService). A form with no
+    # photo box therefore never triggers the question at all.
+    KYCField(
+        id="applicant_photo",
+        display_name="Passport-size Photograph",
+        section=SectionType.DECLARATION,
+        field_type=FieldType.ASSET,
+        required=False,
+        help_text=(
+            "A recent passport-size photograph of you. Upload a JPG or PNG up "
+            "to 5 MB — it is placed inside the photo box printed on your form."
+        ),
+        example="photo.jpg",
+    ),
+    KYCField(
+        id="applicant_signature",
+        display_name="Applicant Signature",
+        section=SectionType.DECLARATION,
+        field_type=FieldType.ASSET,
+        required=False,
+        help_text=(
+            "A photo or scan of your signature on plain paper. Upload a JPG or "
+            "PNG up to 2 MB — it is placed on your form's signature line."
+        ),
+        example="signature.png",
+    ),
     KYCField(
         id="declaration_place",
         display_name="Place",
@@ -476,6 +511,10 @@ _DECLARATION_FIELDS: tuple[KYCField, ...] = (
         required=True,
         placeholder="City where you are signing the form",
         help_text="The city/town where you are signing this declaration.",
+        # A place, not merely a word: without this an answer of "Yes" — meant
+        # for the YES/NO row printed a few lines above on the SBI form — passed
+        # every letters-only rule and was printed as the place of signing.
+        validation_type=ValidationType.PLACE,
         example="Pune",
     ),
     KYCField(
@@ -488,6 +527,207 @@ _DECLARATION_FIELDS: tuple[KYCField, ...] = (
         help_text="The date on which you sign the form.",
         validation_type=ValidationType.DATE,
         example="15-07-2026",
+    ),
+)
+
+# --------------------------------------------------------------------------- #
+# Fields some bank forms capture that the base CVL form does not. All are
+# required=False here: a field only becomes mandatory when a form's schema
+# lists it in `required_session_fields`, so adding them cannot change any
+# existing form's progress or interview.
+# --------------------------------------------------------------------------- #
+
+_SUPPLEMENTARY_FIELDS: tuple[KYCField, ...] = (
+    KYCField(
+        id="account_number",
+        display_name="Account Number",
+        section=SectionType.IDENTITY,
+        field_type=FieldType.TEXT,
+        required=False,
+        placeholder="Your bank account number",
+        help_text="The account this KYC update applies to, as printed on your passbook or statement.",
+        example="30123456789",
+    ),
+    KYCField(
+        id="ckycr_number",
+        display_name="CKYCR Number",
+        section=SectionType.IDENTITY,
+        field_type=FieldType.TEXT,
+        required=False,
+        placeholder="14-digit CKYC identifier",
+        help_text=(
+            "Your Central KYC Registry number, issued once your KYC is registered "
+            "centrally. It appears on earlier KYC acknowledgements."
+        ),
+        example="12345678901234",
+    ),
+    KYCField(
+        id="mother_name",
+        display_name="Mother's Name",
+        section=SectionType.IDENTITY,
+        field_type=FieldType.TEXT,
+        required=False,
+        placeholder="Your mother's full name",
+        help_text="Your mother's full name, as recorded on your identity documents.",
+        validation_type=ValidationType.NAME,
+        example="Sunita Sharma",
+    ),
+    KYCField(
+        id="spouse_name",
+        display_name="Spouse's Name",
+        section=SectionType.IDENTITY,
+        field_type=FieldType.TEXT,
+        required=False,
+        placeholder="Your spouse's full name (if married)",
+        help_text="Leave blank if you are not married.",
+        validation_type=ValidationType.NAME,
+        example="Anjali Sharma",
+    ),
+    KYCField(
+        id="religion",
+        display_name="Religion",
+        section=SectionType.OTHER,
+        field_type=FieldType.TEXT,
+        required=False,
+        placeholder="Optional",
+        help_text="Collected by some banks for statutory reporting. Optional.",
+        example="Hindu",
+    ),
+    KYCField(
+        id="category",
+        display_name="Category",
+        section=SectionType.OTHER,
+        field_type=FieldType.SINGLE_CHOICE,
+        required=False,
+        help_text="Social category as recorded by the bank (General/OBC/SC/ST).",
+        example="General",
+        options=_opts(("general", "General"), ("obc", "OBC"),
+                      ("sc", "SC"), ("st", "ST")),
+    ),
+    KYCField(
+        id="monthly_income",
+        display_name="Monthly Income",
+        section=SectionType.OTHER,
+        field_type=FieldType.NUMBER,
+        required=False,
+        placeholder="Monthly income in rupees",
+        help_text=(
+            "Your income per MONTH in rupees. Some forms ask for a monthly figure "
+            "rather than an annual band — this is kept separate so the two are "
+            "never converted into one another."
+        ),
+        validation_type=ValidationType.NUMBER,
+        example="45000",
+    ),
+    KYCField(
+        id="application_type",
+        display_name="Application Type",
+        section=SectionType.IDENTITY,
+        field_type=FieldType.SINGLE_CHOICE,
+        required=False,
+        help_text=(
+            "Whether this is a NEW KYC registration or an UPDATE to a record "
+            "you already have. An update needs your existing KYC number."
+        ),
+        example="New",
+        options=_opts(("new", "New"), ("update", "Update")),
+    ),
+    KYCField(
+        id="kyc_mode",
+        display_name="KYC Mode",
+        section=SectionType.IDENTITY,
+        field_type=FieldType.SINGLE_CHOICE,
+        required=False,
+        help_text=(
+            "How this KYC is being carried out. Choose Normal unless you are "
+            "completing it online through one of the digital routes."
+        ),
+        example="Normal",
+        options=_opts(
+            ("normal", "Normal"),
+            ("ekyc_otp", "EKYC OTP"),
+            ("ekyc_biometric", "EKYC Biometric"),
+            ("online_kyc", "Online KYC"),
+            ("offline_ekyc", "Offline EKYC"),
+            ("digilocker", "Digilocker"),
+        ),
+    ),
+    KYCField(
+        id="poa_document_number",
+        display_name="Proof of Address — Identification Number",
+        section=SectionType.ADDRESS,
+        field_type=FieldType.TEXT,
+        required=False,
+        placeholder="Number printed on the proof you selected",
+        help_text=(
+            "The identification number of the address proof you chose, as "
+            "printed on that document."
+        ),
+        example="X1234567",
+    ),
+    KYCField(
+        id="address_type",
+        display_name="Address Type",
+        section=SectionType.ADDRESS,
+        field_type=FieldType.SINGLE_CHOICE,
+        required=False,
+        help_text="What this address is used for, as the form classifies it.",
+        example="Residential",
+        options=_opts(
+            ("residential_business", "Residential / Business"),
+            ("residential", "Residential"),
+            ("business", "Business"),
+            ("registered_office", "Registered Office"),
+            ("unspecified", "Unspecified"),
+        ),
+    ),
+    KYCField(
+        id="correspondence_same_as_permanent",
+        display_name="Correspondence Address Same as Current / Permanent",
+        section=SectionType.ADDRESS,
+        field_type=FieldType.SINGLE_CHOICE,
+        required=False,
+        help_text=(
+            "Say Yes if letters should go to the same address you gave above. "
+            "Answering Yes ticks the form's own 'same as' box, so the address "
+            "is never written out twice."
+        ),
+        example="Yes",
+        options=_opts(("yes", "Yes"), ("no", "No")),
+    ),
+    KYCField(
+        id="district",
+        display_name="District",
+        section=SectionType.ADDRESS,
+        field_type=FieldType.TEXT,
+        required=False,
+        placeholder="Revenue district of your address",
+        help_text=(
+            "The district your address falls in, which some forms record "
+            "separately from the city or town."
+        ),
+        example="Nashik",
+    ),
+    KYCField(
+        id="sources_of_funds",
+        display_name="Sources of Funds",
+        section=SectionType.OTHER,
+        field_type=FieldType.MULTI_CHOICE,
+        required=False,
+        placeholder="Salary, Business Income, Agriculture, …",
+        help_text=(
+            "Where the money in this account comes from. Choose every one that "
+            "applies — you can name more than one, e.g. 'Salary and Pension'."
+        ),
+        example="Salary",
+        options=_opts(
+            ("salary", "Salary"),
+            ("business_income", "Business Income"),
+            ("agriculture", "Agriculture"),
+            ("investment_income", "Investment Income"),
+            ("pension", "Pension"),
+            ("others", "Others"),
+        ),
     ),
 )
 
@@ -530,7 +770,7 @@ _KYC_FORM = KYCForm(
             title="Declaration",
             description="Where and when you sign the form.",
             order=4,
-            fields=_DECLARATION_FIELDS,
+            fields=_DECLARATION_FIELDS + _SUPPLEMENTARY_FIELDS,
         ),
     ),
 )

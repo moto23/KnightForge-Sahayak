@@ -164,10 +164,17 @@ export function ProfilePanel({
                   className="flex shrink-0 items-center gap-1.5"
                   title={`From ${field.source_type_label} (${field.source_document_name}) · confidence ${Math.round(field.confidence * 100)}%`}
                 >
-                  {field.validated && (
+                  {field.validated ? (
                     <ShieldCheck
                       className="size-3.5 text-success"
                       aria-label="Validated"
+                    />
+                  ) : (
+                    // Kept and shown, never silently dropped — but it failed
+                    // validation, so it is not written into your form.
+                    <AlertTriangle
+                      className="size-3.5 text-warning"
+                      aria-label="Read but could not be verified — not applied"
                     />
                   )}
                   <span
@@ -248,6 +255,18 @@ export function ProfilePanel({
           {profile.applied_field_ids.length} merged value
           {profile.applied_field_ids.length === 1 ? "" : "s"} applied to your
           interview session — only the remaining fields will be asked.
+          {profile.fields.some((f) => !f.validated) && (
+            <>
+              {" "}
+              Values marked{" "}
+              <AlertTriangle
+                className="inline size-3 text-warning align-[-1px]"
+                aria-hidden
+              />{" "}
+              were read but couldn&apos;t be verified, so they weren&apos;t
+              filled in — you can correct them in the interview.
+            </>
+          )}
         </p>
       </CardContent>
     </Card>

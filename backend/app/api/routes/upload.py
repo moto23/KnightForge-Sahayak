@@ -12,13 +12,19 @@ import logging
 
 from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
 
+from app.core.rate_limit import upload_limiter, limit
 from app.core.dependencies import (
+    owned_document,
     get_current_user,
+    get_document_intelligence_service,
     get_document_understanding_service,
     get_optional_user,
+    get_session_service,
     get_upload_history_service,
     get_upload_service,
 )
+from app.services.document_intelligence_service import DocumentIntelligenceService
+from app.services.session_service import SessionService
 from app.infrastructure.db.models import User
 from app.schemas.upload import (
     DeleteUploadResponse,
@@ -39,6 +45,7 @@ router = APIRouter(prefix="/upload", tags=["Document Upload"])
 
 @router.post(
     "",
+    dependencies=[Depends(limit(upload_limiter))],
     response_model=UploadResponse,
     status_code=201,
     summary="Upload a document",
@@ -68,7 +75,7 @@ async def upload_document(
     user: User | None = Depends(get_optional_user),
 ) -> UploadResponse:
     """Validate and store one uploaded document; return its metadata."""
-    document = await uploads.store_upload(file)
+    document = await uploads.store_upload(file, owner_id=user.id if user else None)
     try:
         # Best-effort journal (Phase 13) — history must never fail an upload.
         history.record_upload(
@@ -116,10 +123,38 @@ async def upload_history(
     description="Metadata for every stored document, newest upload first.",
 )
 async def list_documents(
+    session_id: str | None = None,
     uploads: UploadService = Depends(get_upload_service),
+    intelligence: DocumentIntelligenceService = Depends(
+        get_document_intelligence_service
+    ),
+    sessions: SessionService = Depends(get_session_service),
+    user: User | None = Depends(get_optional_user),
 ) -> ListUploadsResponse:
-    """Return metadata for all stored uploads."""
-    documents = uploads.list_documents()
+    """
+    Return the CALLER's stored uploads, optionally narrowed to one session.
+
+    This used to return every document held by the process, to anyone. That
+    was both a metadata leak and the cause of a phantom third file: the Upload
+    page hydrates "documents in this session" from here, so a bank statement
+    left over from an earlier session reappeared beside a fresh PAN + Aadhaar
+    upload and looked as though it had been uploaded again.
+
+    `session_id` narrows the list to the documents that session actually
+    processed — the authoritative per-session set, which lives in the profile
+    state — so the page shows this workflow's evidence and nothing else.
+    """
+    user_id = user.id if user else None
+    documents = [
+        doc
+        for doc in uploads.list_documents()
+        if getattr(doc, "owner_id", None) is None
+        or getattr(doc, "owner_id", None) == user_id
+    ]
+    if session_id:
+        sessions.assert_owner(session_id, user_id)  # typed 404 when not theirs
+        known = set(intelligence.get_profile(session_id).state.documents)
+        documents = [doc for doc in documents if doc.document_id in known]
     return ListUploadsResponse(
         total=len(documents),
         documents=[DocumentMetadataResponse.from_document(doc) for doc in documents],
@@ -133,7 +168,7 @@ async def list_documents(
     responses={404: {"description": "Document not found."}},
 )
 async def get_document(
-    document_id: str,
+    document_id: str = Depends(owned_document),
     uploads: UploadService = Depends(get_upload_service),
 ) -> DocumentMetadataResponse:
     """Return the metadata record for one uploaded document."""
@@ -152,7 +187,7 @@ async def get_document(
     response_class=Response,
 )
 async def get_document_file(
-    document_id: str,
+    document_id: str = Depends(owned_document),
     uploads: UploadService = Depends(get_upload_service),
 ) -> Response:
     """Return the raw stored bytes for in-browser document preview."""
@@ -176,7 +211,7 @@ async def get_document_file(
     responses={404: {"description": "Document not found."}},
 )
 async def delete_document(
-    document_id: str,
+    document_id: str = Depends(owned_document),
     uploads: UploadService = Depends(get_upload_service),
     understanding: DocumentUnderstandingService = Depends(
         get_document_understanding_service

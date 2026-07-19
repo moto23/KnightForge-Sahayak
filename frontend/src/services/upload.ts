@@ -25,7 +25,12 @@ export const uploadService = {
     apiUpload<UploadResponse>("/upload", file, onProgress, signal, {
       document_type: documentType,
     }),
-  list: () => api.get<ListUploadsResponse>("/upload"),
+  /** Documents for ONE session. Without a session id the backend returns
+   *  the caller's whole library, which is not what a workflow should show. */
+  list: (sessionId?: string) =>
+    api.get<ListUploadsResponse>(
+      sessionId ? `/upload?session_id=${encodeURIComponent(sessionId)}` : "/upload",
+    ),
   /** The signed-in account's persistent upload history (Phase 13). */
   history: (signal?: AbortSignal) =>
     api.get<UploadHistoryResponse>("/upload/history", { signal }),

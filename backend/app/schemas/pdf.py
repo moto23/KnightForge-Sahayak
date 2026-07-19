@@ -32,10 +32,26 @@ class GeneratedPdfResponse(BaseModel):
     fields_filled: int = Field(..., description="Answered fields painted onto the form.")
     generated_at: datetime = Field(..., description="Generation time (UTC).")
     download_url: str = Field(..., description="Relative URL to download the file.")
+    is_current: bool = Field(
+        default=False,
+        description=(
+            "True when this PDF was generated from the session's CURRENT "
+            "answers. False means the workflow moved on (a document was "
+            "deleted, an answer changed) — the file is history, not the "
+            "current output. The file itself is never modified."
+        ),
+    )
 
     @classmethod
-    def from_domain(cls, record: GeneratedPdf) -> "GeneratedPdfResponse":
-        """Map the domain record onto the API DTO (adds the download URL)."""
+    def from_domain(
+        cls, record: GeneratedPdf, current_fingerprint: str | None = None
+    ) -> "GeneratedPdfResponse":
+        """
+        Map the domain record onto the API DTO (adds the download URL).
+
+        `current_fingerprint` is the live session's answer digest; when it is
+        supplied the DTO reports whether this PDF still matches it.
+        """
         return cls(
             pdf_id=record.pdf_id,
             generated_by_session=record.generated_by_session,
@@ -46,6 +62,10 @@ class GeneratedPdfResponse(BaseModel):
             fields_filled=record.fields_filled,
             generated_at=record.generated_at,
             download_url=f"/pdf/{record.pdf_id}/download",
+            is_current=(
+                current_fingerprint is not None
+                and record.answers_fingerprint == current_fingerprint
+            ),
         )
 
 

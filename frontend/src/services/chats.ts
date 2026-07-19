@@ -22,10 +22,10 @@ export const chatsService = {
     ),
   get: (chatId: string, signal?: AbortSignal) =>
     api.get<ChatDetailResponse>(`/chats/${chatId}`, { signal }),
-  ask: (chatId: string, question: string) =>
+  ask: (chatId: string, question: string, sessionId?: string | null) =>
     api.post<AskChatResponse>(
       `/chats/${chatId}/messages`,
-      { question },
+      { question, session_id: sessionId ?? null },
       { timeoutMs: 90_000 }, // embedding + Gemini can take a while
     ),
   rename: (chatId: string, title: string) =>

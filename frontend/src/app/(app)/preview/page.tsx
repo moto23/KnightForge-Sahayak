@@ -4,8 +4,10 @@ import * as React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
+  AlertTriangle,
   ArrowRight,
   Download,
+  Pencil,
   FileCheck2,
   FileText,
   ListTodo,
@@ -14,6 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { Celebration } from "@/components/shared/celebration";
 import { PageHeader } from "@/components/shared/page-header";
 import {
   EmptyState,
@@ -42,7 +45,7 @@ import {
 import { SkeletonRow } from "@/components/ui/skeleton";
 import { useAsync } from "@/hooks/use-async";
 import { useKycSession } from "@/hooks/use-kyc-session";
-import { absoluteUrl, toApiError } from "@/services/api-client";
+import { downloadProtectedFile, toApiError } from "@/services/api-client";
 import { pdfService } from "@/services";
 import type { GeneratedPdfResponse } from "@/types/api";
 import { formatBytes, formatDateTime } from "@/utils/format";
@@ -55,12 +58,18 @@ import { formatBytes, formatDateTime } from "@/utils/format";
 export default function PreviewPage() {
   const { sessionId, progress, fieldMap, restoring } = useKycSession();
 
-  const pdfList = useAsync((signal) => pdfService.list(signal), []);
+  // Pass the session so the backend can mark which record (if any) still
+  // matches the CURRENT answers — the rest are immutable history.
+  const pdfList = useAsync(
+    (signal) => pdfService.list(sessionId, signal),
+    [sessionId],
+  );
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [lastGenerated, setLastGenerated] =
     React.useState<GeneratedPdfResponse | null>(null);
   const [generating, setGenerating] = React.useState(false);
   const [missingFields, setMissingFields] = React.useState<string[] | null>(null);
+  const [celebrating, setCelebrating] = React.useState(false);
 
   // Selection is DERIVED (no state-sync effect): explicit choice if it still
   // exists, else the just-generated PDF, else the newest in the list.
@@ -76,6 +85,46 @@ export default function PreviewPage() {
 
   const completed = progress?.interview_status === "completed";
 
+  /* --- one-time completion celebration ---------------------------------- */
+
+  /**
+   * Which generated PDFs have already been celebrated, keyed by pdf_id.
+   *
+   * sessionStorage (not state) because the requirement is "once per newly
+   * completed PDF", and state alone would replay the celebration on every
+   * refresh or revisit. Each generation mints a fresh pdf_id, so a genuine new
+   * version celebrates again while re-viewing an old one never does.
+   *
+   * Note this is only reached from the `generate()` success path — arriving at
+   * /preview directly, or simply having an old PDF in history, never triggers
+   * it, because no new pdf_id was produced.
+   */
+  const CELEBRATED_KEY = "sahayak:celebrated-pdfs";
+
+  const alreadyCelebrated = (pdfId: string): boolean => {
+    try {
+      const raw = sessionStorage.getItem(CELEBRATED_KEY);
+      return raw ? (JSON.parse(raw) as string[]).includes(pdfId) : false;
+    } catch {
+      return false; // storage blocked/full — degrade to celebrating
+    }
+  };
+
+  const markCelebrated = (pdfId: string) => {
+    try {
+      const raw = sessionStorage.getItem(CELEBRATED_KEY);
+      const seen = raw ? (JSON.parse(raw) as string[]) : [];
+      sessionStorage.setItem(
+        CELEBRATED_KEY,
+        // Bounded: only the recent ids matter, and this must never grow
+        // without limit in a long session.
+        JSON.stringify([...seen, pdfId].slice(-20)),
+      );
+    } catch {
+      /* non-fatal — worst case the celebration repeats once */
+    }
+  };
+
   /* --- generate -------------------------------------------------------- */
   const generate = async () => {
     if (!sessionId) {
@@ -88,12 +137,19 @@ export default function PreviewPage() {
     setMissingFields(null);
     try {
       const result = await pdfService.generate(sessionId);
-      toast.success("PDF generated 🎉", {
-        description: `${result.pdf.fields_filled} fields placed onto the official form.`,
+      toast.success("PDF generated", {
+        description: `${result.pdf.fields_filled} fields placed onto your form.`,
       });
       pdfList.reload();
       setLastGenerated(result.pdf);
       setSelectedId(result.pdf.pdf_id);
+      // Celebrate only a GENUINELY new, complete result. The backend already
+      // refuses to generate an incomplete session (409, including any required
+      // photo/signature), so reaching here means every requirement was met.
+      if (!alreadyCelebrated(result.pdf.pdf_id)) {
+        markCelebrated(result.pdf.pdf_id);
+        setCelebrating(true);
+      }
     } catch (err) {
       const apiError = toApiError(err);
       if (apiError.status === 409) {
@@ -130,6 +186,9 @@ export default function PreviewPage() {
     return <LoadingAnimation label="Loading…" className="min-h-[50dvh]" />;
   }
 
+  /** Any version generated yet? Drives "Generate" vs "Save new version". */
+  const hasAnyPdf = (pdfList.data?.length ?? 0) > 0 || lastGenerated !== null;
+
   const metadata: { label: string; value: string }[] = selected
     ? [
         { label: "Template", value: `${selected.template_id} v${selected.template_version}` },
@@ -145,7 +204,7 @@ export default function PreviewPage() {
     <div className="space-y-6">
       <PageHeader
         title="PDF Preview"
-        description="Your validated answers, placed onto the official form — generate, review and download."
+        description="Your validated answers, placed onto your own uploaded form — generate, review and download."
         actions={
           <>
             <Button
@@ -154,24 +213,46 @@ export default function PreviewPage() {
               loading={generating}
               disabled={!sessionId}
             >
-              {generating ? "Generating…" : (
+              {generating ? (
+                "Generating…"
+              ) : (
                 <>
-                  <Sparkles aria-hidden /> Generate PDF
+                  <Sparkles aria-hidden />
+                  {/* Regenerating never overwrites: it adds a new version
+                      and the previous one stays in history. */}
+                  {hasAnyPdf ? "Save new version" : "Generate PDF"}
                 </>
               )}
             </Button>
+            <Button variant="outline" asChild>
+              <Link href="/progress">
+                <Pencil aria-hidden /> Edit answers
+              </Link>
+            </Button>
             {selected && (
-              <Button variant="outline" asChild>
-                <a
-                  href={absoluteUrl(selected.download_url)}
-                  download={`kyc-filled-${selected.pdf_id.slice(0, 8)}.pdf`}
+              <Button variant="outline"
+                  onClick={() =>
+                    void downloadProtectedFile(
+                      selected.download_url,
+                      `kyc-filled-${selected.pdf_id.slice(0, 8)}.pdf`,
+                    ).catch((err) =>
+                      toast.error("Couldn't download the PDF", {
+                        description: toApiError(err).message,
+                      }),
+                    )
+                  }
                 >
                   <Download aria-hidden /> Download
-                </a>
-              </Button>
+                </Button>
             )}
           </>
         }
+      />
+
+      <Celebration
+        show={celebrating}
+        message="🎉 Your completed KYC form is ready to review."
+        onDismiss={() => setCelebrating(false)}
       />
 
       {/* Incomplete gate (409) */}
@@ -235,20 +316,38 @@ export default function PreviewPage() {
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {selected.page_count} pages · {formatBytes(selected.file_size)} ·{" "}
-                    {selected.fields_filled} fields placed pixel-perfectly
+                    {selected.fields_filled} fields placed on your form
                   </p>
                   <p className="text-xs text-muted-foreground">
                     The original template layout, fonts and legal text are untouched —
                     only your validated answers were added.
                   </p>
+                  {!selected.is_current && (
+                    // The file itself is never rewritten — it stays valid
+                    // history. It just no longer reflects this session.
+                    <p
+                      className="flex items-center justify-center gap-1.5 text-xs text-warning"
+                      role="status"
+                    >
+                      <AlertTriangle className="size-3.5 shrink-0" aria-hidden />
+                      Your answers or documents changed since this was made —
+                      regenerate for an up-to-date form.
+                    </p>
+                  )}
                 </div>
-                <Button variant="gradient" size="lg" asChild>
-                  <a
-                    href={absoluteUrl(selected.download_url)}
-                    download={`kyc-filled-${selected.pdf_id.slice(0, 8)}.pdf`}
-                  >
+                <Button variant="gradient" size="lg"
+                  onClick={() =>
+                    void downloadProtectedFile(
+                      selected.download_url,
+                      `kyc-filled-${selected.pdf_id.slice(0, 8)}.pdf`,
+                    ).catch((err) =>
+                      toast.error("Couldn't download the PDF", {
+                        description: toApiError(err).message,
+                      }),
+                    )
+                  }
+                >
                     <Download aria-hidden /> Download PDF
-                  </a>
                 </Button>
               </motion.div>
             ) : completed ? (

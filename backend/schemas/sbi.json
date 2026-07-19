@@ -1,27 +1,376 @@
 {
   "id": "sbi_kyc",
-  "label": "SBI KYC Form",
+  "label": "SBI KYC Updation - Annexure A",
   "kind": "kyc_form",
   "markers": {
-    "strong": ["state bank of india"],
-    "weak": ["sbi", "kyc", "know your customer", "customer information", "application form", "branch code", "cif"],
-    "min_score": 4
+    "strong": [
+      "self declaration form for kyc updation",
+      "kyc annexure",
+      "kyc updation form individual",
+      "customer's declaration"
+    ],
+    "weak": [
+      "state bank of india",
+      "sbi",
+      "ckycr",
+      "ckycr no",
+      "kyc updation",
+      "annexure b",
+      "ovds submitted to bank",
+      "date of expiry of ovd",
+      "sources of funds",
+      "monthly income",
+      "spouse name",
+      "mother's name",
+      "branch code"
+    ],
+    "min_score": 6
   },
+  "required_canonical": [
+    "name",
+    "dob",
+    "father_name",
+    "pan",
+    "address",
+    "city",
+    "state",
+    "pincode",
+    "mobile",
+    "email"
+  ],
+  "required_session_fields": [
+    "account_number",
+    "ckycr_number",
+    "occupation",
+    "monthly_income",
+    "district",
+    "country",
+    "sources_of_funds",
+    "declaration_place",
+    "declaration_date"
+  ],
+  "never_prefill": [
+    "state",
+    "email"
+  ],
+  "conditional_required": [
+    {
+      "field_id": "nationality_other",
+      "when_field": "nationality",
+      "equals": [
+        "other"
+      ]
+    }
+  ],
   "fields": [
-    {"canonical": "father_name", "labels": ["father's/spouse name", "father's name", "fathers name", "spouse name"]},
-    {"canonical": "name", "labels": ["name of the customer", "customer name", "name of applicant", "applicant name", "full name", "name"]},
-    {"canonical": "dob", "labels": ["date of birth", "dob"]},
-    {"canonical": "gender", "labels": ["gender", "sex"]},
-    {"canonical": "nationality", "labels": ["nationality"]},
-    {"canonical": "pan", "labels": ["pan", "permanent account number", "pan no"], "document_wide": true},
-    {"canonical": "aadhaar", "labels": ["aadhaar", "aadhaar number", "uid"], "document_wide": true},
-    {"canonical": "address", "labels": ["communication address", "correspondence address", "current address", "residential address", "address"]},
-    {"canonical": "city", "labels": ["city/town/village", "city", "town"]},
-    {"canonical": "state", "labels": ["state"]},
-    {"canonical": "pincode", "labels": ["pin code", "pincode", "pin"]},
-    {"canonical": "mobile", "labels": ["mobile no", "mobile number", "mobile"], "document_wide": true},
-    {"canonical": "email", "labels": ["e-mail id", "email id", "e-mail", "email"], "document_wide": true},
-    {"canonical": "income", "labels": ["gross annual income", "annual income", "income range", "income"]},
-    {"canonical": "occupation", "labels": ["occupation type", "occupation", "nature of business"]}
-  ]
+    {
+      "canonical": "name",
+      "labels": [
+        "name (same as id proof)",
+        "name of the customer",
+        "customer name",
+        "applicant name",
+        "full name",
+        "name"
+      ]
+    },
+    {
+      "canonical": "father_name",
+      "labels": [
+        "name of father/mother/spouse",
+        "name of father/mother",
+        "father/mother/spouse",
+        "name of father",
+        "father's name",
+        "fathers name",
+        "spouse name"
+      ]
+    },
+    {
+      "canonical": "dob",
+      "labels": [
+        "date of birth",
+        "dob"
+      ]
+    },
+    {
+      "canonical": "gender",
+      "labels": [
+        "gender",
+        "sex"
+      ]
+    },
+    {
+      "canonical": "nationality",
+      "labels": [
+        "nationality"
+      ]
+    },
+    {
+      "canonical": "pan",
+      "labels": [
+        "pan/tax identification number",
+        "pan no",
+        "pan",
+        "permanent account number"
+      ],
+      "document_wide": true
+    },
+    {
+      "canonical": "aadhaar",
+      "labels": [
+        "uid(aadhar)",
+        "uid aadhar",
+        "aadhaar number",
+        "aadhaar",
+        "uid"
+      ],
+      "document_wide": true
+    },
+    {
+      "canonical": "address",
+      "labels": [
+        "address details",
+        "correspondence address",
+        "current address",
+        "residential address",
+        "address"
+      ]
+    },
+    {
+      "canonical": "city",
+      "labels": [
+        "city/village",
+        "city village",
+        "city",
+        "town"
+      ]
+    },
+    {
+      "canonical": "state",
+      "labels": [
+        "state"
+      ]
+    },
+    {
+      "canonical": "pincode",
+      "labels": [
+        "pin code",
+        "pincode",
+        "pin"
+      ]
+    },
+    {
+      "canonical": "mobile",
+      "labels": [
+        "mobile no",
+        "mobile number",
+        "mobile"
+      ],
+      "document_wide": true
+    },
+    {
+      "canonical": "email",
+      "labels": [
+        "e-mail id",
+        "email id",
+        "e-mail",
+        "email"
+      ],
+      "document_wide": true
+    },
+    {
+      "canonical": "income",
+      "labels": [
+        "monthly income",
+        "gross annual income",
+        "annual income",
+        "income"
+      ]
+    },
+    {
+      "canonical": "occupation",
+      "labels": [
+        "occupation type",
+        "occupation"
+      ]
+    },
+    {
+      "extra_key": "customer_id",
+      "extra_label": "Customer ID",
+      "labels": [
+        "existing customer id",
+        "customer id"
+      ]
+    },
+    {
+      "extra_key": "account_number",
+      "extra_label": "Account Number",
+      "labels": [
+        "account no",
+        "account number"
+      ],
+      "value_kind": "account_no"
+    },
+    {
+      "extra_key": "ckyc_number",
+      "extra_label": "CKYC Number",
+      "labels": [
+        "ckyc no",
+        "ckyc number"
+      ]
+    },
+    {
+      "extra_key": "branch_name",
+      "extra_label": "Branch Name",
+      "labels": [
+        "branch name"
+      ]
+    },
+    {
+      "extra_key": "branch_code",
+      "extra_label": "Branch Code",
+      "labels": [
+        "branch code"
+      ]
+    },
+    {
+      "extra_key": "maiden_name",
+      "extra_label": "Maiden Name",
+      "labels": [
+        "maiden name"
+      ]
+    },
+    {
+      "extra_key": "marital_status",
+      "extra_label": "Marital Status",
+      "labels": [
+        "marital status"
+      ]
+    },
+    {
+      "extra_key": "guardian_name",
+      "extra_label": "Name of Guardian",
+      "labels": [
+        "name of guardian"
+      ]
+    },
+    {
+      "extra_key": "dependents",
+      "extra_label": "No. of Dependents",
+      "labels": [
+        "no. of dependents",
+        "no of dependents"
+      ],
+      "value_kind": "number"
+    },
+    {
+      "extra_key": "net_worth",
+      "extra_label": "Net Worth",
+      "labels": [
+        "net worth"
+      ]
+    },
+    {
+      "extra_key": "source_of_income",
+      "extra_label": "Source of Income",
+      "labels": [
+        "source of income"
+      ]
+    },
+    {
+      "extra_key": "religion",
+      "extra_label": "Religion",
+      "labels": [
+        "religion"
+      ]
+    },
+    {
+      "extra_key": "category",
+      "extra_label": "Category",
+      "labels": [
+        "category"
+      ]
+    },
+    {
+      "extra_key": "education",
+      "extra_label": "Educational Qualification",
+      "labels": [
+        "educational qualification"
+      ]
+    },
+    {
+      "extra_key": "organization_name",
+      "extra_label": "Organization's Name",
+      "labels": [
+        "organization's name",
+        "organizations name"
+      ]
+    },
+    {
+      "extra_key": "designation",
+      "extra_label": "Designation/Profession",
+      "labels": [
+        "designation/profession",
+        "designation"
+      ]
+    },
+    {
+      "extra_key": "nature_of_business",
+      "extra_label": "Nature of Business",
+      "labels": [
+        "nature of business"
+      ]
+    },
+    {
+      "extra_key": "place_of_birth",
+      "extra_label": "Place/City of Birth",
+      "labels": [
+        "place/city of birth",
+        "place of birth",
+        "city of birth"
+      ]
+    },
+    {
+      "extra_key": "citizenship",
+      "extra_label": "Citizenship",
+      "labels": [
+        "citizenship"
+      ]
+    },
+    {
+      "extra_key": "district",
+      "extra_label": "District",
+      "labels": [
+        "district"
+      ]
+    },
+    {
+      "extra_key": "poi_document_number",
+      "extra_label": "Document/Identification Number",
+      "labels": [
+        "document no/identification number",
+        "document no",
+        "identification number"
+      ]
+    },
+    {
+      "extra_key": "issue_date",
+      "extra_label": "Issue Date",
+      "labels": [
+        "issue date"
+      ],
+      "value_kind": "date"
+    },
+    {
+      "extra_key": "expiry_date",
+      "extra_label": "Expiry Date",
+      "labels": [
+        "expiry date"
+      ],
+      "value_kind": "date"
+    }
+  ],
+  "requires_photo": true,
+  "requires_signature": true
 }

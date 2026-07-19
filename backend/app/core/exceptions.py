@@ -102,6 +102,18 @@ class EmptyUploadError(DomainError):
         super().__init__(detail)
 
 
+class FieldNotSkippableError(DomainError):
+    """400 - the active form genuinely requires this field, so it cannot be skipped."""
+
+    code = "field_not_skippable"
+    status_code = 400
+
+    def __init__(self, display_name: str) -> None:
+        super().__init__(
+            f"{display_name} is required for this form and cannot be skipped."
+        )
+
+
 class DocumentNotFoundError(DomainError):
     """Raised when a requested document id does not exist."""
 
@@ -306,6 +318,131 @@ class InvalidPrimaryFormError(DomainError):
             "supported primary forms."
         )
         self.form_id = form_id
+
+
+class NotAPrimaryFormError(DomainError):
+    """
+    Raised when a file uploaded into the PRIMARY slot is not a supported KYC
+    form (a PAN card, an Aadhaar, a bank statement…).
+
+    The verdict comes from CONTENT classification, never the filename, and it
+    is raised BEFORE the document can activate a primary form or merge through
+    the primary path — so a misplaced PAN card can never become the target
+    document the final PDF is written onto.
+    """
+
+    status_code = 422
+    code = "not_a_primary_form"
+
+    def __init__(self, detected_label: str) -> None:
+        super().__init__(
+            "This doesn't appear to be a supported primary KYC form. Please "
+            "upload a CVL/CDSL, SBI, HDFC, ICICI or Axis KYC form."
+        )
+        self.detected_label = detected_label
+
+
+class PrimaryFormInSupportingSlotError(DomainError):
+    """
+    Raised when a supported KYC form is uploaded as a SUPPORTING document.
+
+    Not a hard failure of the user's intent — they uploaded a real, supported
+    form, just in the wrong slot — so the message points at the fix rather than
+    at the mistake.
+    """
+
+    status_code = 422
+    code = "primary_form_in_supporting_slot"
+
+    def __init__(self, detected_label: str) -> None:
+        super().__init__(
+            f"This looks like a {detected_label}. Upload it under “Primary "
+            "form” — that's the document Sahayak completes for you."
+        )
+        self.detected_label = detected_label
+
+
+# --------------------------------------------------------------------------- #
+# Phase 15 — Form assets (photograph / signature)
+# --------------------------------------------------------------------------- #
+
+
+class NoActivePrimaryFormError(DomainError):
+    """
+    Raised when generating a PDF with no primary form active.
+
+    The primary form IS the output document, so without one there is nothing
+    to produce — distinct from "the interview is incomplete", which means the
+    form exists but is missing answers. Deleting the primary form puts a
+    session here, and the message tells the user the one thing that fixes it.
+    """
+
+    status_code = 409
+    code = "no_active_primary_form"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Start a new KYC workflow by uploading a primary KYC form."
+        )
+
+
+class AssetNotRequiredError(DomainError):
+    """
+    Raised when uploading a photo/signature the ACTIVE form does not ask for.
+
+    Guards the promise that an asset is never collected "just in case": if the
+    primary form has no photo box, there is nowhere to put a photograph and the
+    upload is refused rather than stored unused.
+    """
+
+    status_code = 422
+    code = "asset_not_required"
+
+    def __init__(self, kind: str) -> None:
+        super().__init__(
+            f"Your selected form does not require a {kind} — nothing to upload."
+        )
+        self.kind = kind
+
+
+class AssetNotFoundError(DomainError):
+    """Raised when a session has no asset of the requested kind."""
+
+    status_code = 404
+    code = "asset_not_found"
+
+    def __init__(self, kind: str) -> None:
+        super().__init__(f"No {kind} has been uploaded for this session.")
+        self.kind = kind
+
+
+class InvalidAssetError(DomainError):
+    """
+    Raised when an uploaded photo/signature fails type, size or decode checks.
+
+    Decodability is checked deliberately: a file can carry a valid PNG header
+    and still be truncated garbage, and that only surfaces at PDF-generation
+    time — long after the user has moved on — unless it is caught here.
+    """
+
+    status_code = 422
+    code = "invalid_asset"
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(detail)
+
+
+class AssetTooLargeError(DomainError):
+    """Raised when a photo/signature exceeds its per-kind size cap."""
+
+    status_code = 413
+    code = "asset_too_large"
+
+    def __init__(self, kind: str, max_mb: float) -> None:
+        limit = f"{max_mb:g}"
+        super().__init__(f"Your {kind} is too large — the maximum is {limit} MB.")
+        self.kind = kind
+        self.max_mb = max_mb
 
 
 # --------------------------------------------------------------------------- #

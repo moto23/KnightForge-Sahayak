@@ -13,23 +13,27 @@ import { cn } from "@/lib/utils";
 const FAQS = [
   {
     q: "Which forms does Sahayak support today?",
-    a: "The MVP is laser-focused on the CVL Individual KYC form — the one everyone needs for mutual funds and demat accounts. The architecture is schema-driven, so new forms are added as data, not code.",
+    a: "Five KYC forms can be set as your primary form: CVL/CDSL, SBI, HDFC, ICICI and Axis. Each one brings its own required fields and conditional questions. The architecture is schema-driven, so additional forms are added as data rather than code.",
+  },
+  {
+    q: "What can I upload as supporting documents?",
+    a: "PAN, Aadhaar, passport, driving licence, bank statement, utility bill, voter ID, ration card and other address proofs — several at once. You don't pick the type: Sahayak classifies each document, extracts what it can read, and merges the results into one profile.",
   },
   {
     q: "Do my documents get uploaded to the cloud?",
-    a: "No. OCR, validation and PDF generation all run locally. Your Aadhaar and PAN never travel anywhere.",
+    a: "Your files stay on the Sahayak backend you deploy — they aren't sent to a third-party document service. When AI assistance is enabled, the text extracted from your documents (not the files themselves) is sent to Google Gemini so it can read fields semantically and answer questions. Without an AI key, Sahayak falls back to deterministic extraction and still works end to end.",
   },
   {
-    q: "What if the OCR reads something wrong?",
-    a: "Every extracted value carries a confidence score and passes deterministic validation. Anything below the bar is never prefilled — the AI simply asks you instead, and you can review every field before generating the PDF.",
+    q: "What if something is read incorrectly?",
+    a: "Every extracted value carries a source document, a confidence score and a validation result. Values that fail validation are shown and flagged rather than filled in, and when two documents disagree you're asked to choose. Nothing is generated until you've reviewed the profile.",
   },
   {
     q: "Can I fill the form without uploading anything?",
-    a: "Absolutely. Skip the upload and the AI interview will walk you through all fields from scratch, one friendly question at a time.",
+    a: "Yes. Skip the uploads and the AI-Guided Completion walks you through the fields your chosen form requires, one question at a time.",
   },
   {
-    q: "Is the generated PDF actually the official form?",
-    a: "Yes — your answers are overlaid onto the original template. The layout, fonts and legal text are untouched; only your data is added, exactly where a pen would put it.",
+    q: "Is the generated PDF actually my form?",
+    a: "Yes — when you upload your primary form, Sahayak fills a copy of that exact file. Its layout, fonts and legal text are untouched; only your answers are added. Your original upload is preserved, and each generation is saved as a new version so earlier ones remain available.",
   },
 ];
 

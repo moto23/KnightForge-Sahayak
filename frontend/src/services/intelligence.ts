@@ -15,10 +15,14 @@ import type {
 
 export const intelligenceService = {
   /** Run the schema-driven pipeline for one uploaded document. */
-  process: (documentId: string, sessionId: string) =>
+  /**
+   * `isPrimary` marks this upload as the form to be completed and returned —
+   * the generated PDF is then that exact file, filled in.
+   */
+  process: (documentId: string, sessionId: string, isPrimary = false) =>
     api.post<IntelligenceProcessResponse>(
       "/intelligence/process",
-      { document_id: documentId, session_id: sessionId },
+      { document_id: documentId, session_id: sessionId, is_primary: isPrimary },
       { timeoutMs: 60_000 }, // first call may trigger OCR on scanned PDFs
     ),
   /** The session's unified profile (re-synced; deleted docs drop out). */

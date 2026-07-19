@@ -25,10 +25,31 @@ export const DOCUMENT_TYPE_LABELS: Record<string, string> = Object.fromEntries(
  * The PRIMARY forms a session can generate as its final output (backend
  * schema ids of kind "kyc_form"). Supporting documents are only evidence.
  */
+/**
+ * Supporting documents Sahayak recognises, shown as INFORMATIONAL hints only.
+ *
+ * Deliberately not selectable: the backend classifies every file by its actual
+ * content, so letting the user pre-declare a type would either be ignored (and
+ * feel broken) or override a better verdict. These chips exist purely to answer
+ * "what can I upload here?".
+ */
+export const SUPPORTING_DOCUMENT_HINTS: string[] = [
+  "PAN",
+  "Aadhaar",
+  "Bank Statement",
+  "Voter ID / EPIC",
+  "Passport",
+  "Driving Licence",
+  "Utility Bill",
+  "Ration Card",
+  "Address Proof",
+  "Other",
+];
+
 export const PRIMARY_FORMS: { value: string; label: string }[] = [
   { value: "cvl_kyc", label: "CVL KYC (CDSL)" },
-  { value: "sbi_kyc", label: "SBI KYC" },
+  { value: "sbi_kyc", label: "SBI KYC Updation — Annexure A" },
   { value: "hdfc_kyc", label: "HDFC KYC" },
-  { value: "icici_kyc", label: "ICICI KYC" },
-  { value: "axis_kyc", label: "Axis KYC" },
+  { value: "icici_kyc", label: "ICICI KYC — Central KYC Registry" },
+  { value: "axis_kyc", label: "Axis Bank KYC — Central KYC Registry" },
 ];

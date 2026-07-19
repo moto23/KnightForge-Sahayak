@@ -10,7 +10,7 @@ Pure domain logic: no I/O, no HTTP, trivially unit-testable
 (next_required_field({}) -> first required field of the form).
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 from app.domain.kyc_schema import KYCSchemaRegistry, kyc_registry
 from app.domain.models import KYCField
@@ -35,14 +35,29 @@ class NextQuestionEngine:
         return None
 
     def remaining_required_fields(
-        self, answers: Mapping[str, str]
+        self,
+        answers: Mapping[str, str],
+        required_ids: Sequence[str] | None = None,
     ) -> tuple[KYCField, ...]:
-        """All required fields (in form order) still missing a valid answer."""
-        return tuple(
-            field
-            for field in self._registry.required_fields()
-            if field.id not in answers
-        )
+        """
+        All required fields (in form order) still missing a valid answer.
+
+        `required_ids` scopes the check to the ACTIVE primary form's
+        requirements (Phase 13). When given, fields outside that set are not
+        required — so an ICICI session is never blocked by a CVL-only field.
+        Passing None keeps the registry's own required set.
+        """
+        # `is None` only: an EMPTY sequence is a real scope meaning "no active
+        # form, therefore nothing is required" — it must NOT fall back to the
+        # registry default, or a deleted primary form keeps gating the PDF.
+        if required_ids is None:
+            candidates = self._registry.required_fields()
+        else:
+            scoped = set(required_ids)
+            candidates = tuple(
+                f for f in self._registry.all_fields() if f.id in scoped
+            )
+        return tuple(field for field in candidates if field.id not in answers)
 
 
 # Stateless singleton — safe to share across requests.

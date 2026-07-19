@@ -24,7 +24,9 @@ export type FieldType =
   | "phone"
   | "single_choice"
   | "multi_choice"
-  | "boolean";
+  | "boolean"
+  /** An uploaded image (photograph, signature) — rendered as a file picker. */
+  | "asset";
 
 export type Language = "english" | "hinglish" | "hindi";
 
@@ -306,6 +308,8 @@ export interface GeneratedPdfResponse {
   fields_filled: number;
   generated_at: string;
   download_url: string;
+  /** True only while this PDF matches the session's current answers. */
+  is_current: boolean;
 }
 
 export interface GeneratePdfResponse {
@@ -598,4 +602,53 @@ export interface UploadHistoryItem {
 export interface UploadHistoryResponse {
   total: number;
   items: UploadHistoryItem[];
+}
+
+/* --------------------------------------------------------------------------
+ * Form assets — the photograph / signature a KYC form may require.
+ * Only present when the ACTIVE primary form actually asks for them.
+ * ----------------------------------------------------------------------- */
+
+export type AssetKind = "photo" | "signature";
+
+export interface SessionAsset {
+  asset_id: string;
+  kind: AssetKind;
+  /** The interview field this asset answers (applicant_photo/_signature). */
+  field_id: string;
+  original_filename: string;
+  content_type: string;
+  file_size: number;
+  width: number;
+  height: number;
+  uploaded_at: string;
+  file_url: string;
+}
+
+export interface AssetRequirement {
+  kind: AssetKind;
+  field_id: string;
+  /** Does the ACTIVE form ask for it? False = never mention it to the user. */
+  required: boolean;
+  provided: boolean;
+  max_bytes: number;
+  accepted_types: string[];
+  asset: SessionAsset | null;
+}
+
+export interface SessionAssetsResponse {
+  session_id: string;
+  /** 'document' (the uploaded form was inspected) | 'schema' | 'none'. */
+  detected_from: string;
+  requirements: AssetRequirement[];
+}
+
+export interface AssetUploadResponse {
+  message: string;
+  asset: SessionAsset;
+}
+
+export interface AssetDeleteResponse {
+  kind: AssetKind;
+  deleted: boolean;
 }

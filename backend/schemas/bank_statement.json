@@ -3,23 +3,163 @@
   "label": "Bank Statement",
   "kind": "identity_document",
   "markers": {
-    "strong": ["statement of account", "account statement", "bank statement"],
-    "weak": ["ifsc", "account no", "account number", "branch", "opening balance", "closing balance", "transaction", "withdrawal", "deposit", "cheque"],
-    "patterns": ["\\b[A-Z]{4}0[A-Z0-9]{6}\\b"],
+    "strong": [
+      "account statement",
+      "bank statement",
+      "customer information file",
+      "generally used abbreviations",
+      "passbook",
+      "savings account statement",
+      "savings bank account",
+      "statement of account",
+      "statement of transactions"
+    ],
+    "weak": [
+      "a/c no",
+      "account no",
+      "account number",
+      "account type",
+      "available balance",
+      "balance",
+      "branch",
+      "branch code",
+      "cheque",
+      "cif",
+      "cif no",
+      "closing balance",
+      "credit",
+      "customer id",
+      "customer name",
+      "date of issue",
+      "debit",
+      "deposit",
+      "ifsc",
+      "imps",
+      "micr",
+      "narration",
+      "neft",
+      "nom. reg. no",
+      "nomination",
+      "opening balance",
+      "rtgs",
+      "state bank of india",
+      "statement period",
+      "transaction",
+      "upi",
+      "value date",
+      "withdrawal"
+    ],
+    "patterns": [
+      "\\b[A-Z]{4}0[A-Z0-9]{6}\\b"
+    ],
     "min_score": 3
   },
   "fields": [
-    {"canonical": "name", "labels": ["account holder", "account holder name", "customer name", "name"]},
-    {"canonical": "address", "labels": ["address", "customer address", "mailing address"]},
-    {"canonical": "city", "labels": ["city"]},
-    {"canonical": "pincode", "labels": ["pin code", "pincode"], "document_wide": true},
-    {"canonical": "mobile", "labels": ["mobile", "registered mobile", "phone"], "document_wide": true},
-    {"canonical": "email", "labels": ["e-mail", "email"], "document_wide": true},
-    {"canonical": "pan", "labels": ["pan"], "document_wide": true},
-    {"extra_key": "account_number", "extra_label": "Account Number", "labels": ["account no", "account number", "a/c no"], "value_kind": "account_no"},
-    {"extra_key": "ifsc", "extra_label": "IFSC Code", "labels": ["ifsc", "ifs code"], "value_kind": "ifsc", "document_wide": true},
-    {"extra_key": "branch", "extra_label": "Branch", "labels": ["branch name", "branch"]},
-    {"extra_key": "customer_id", "extra_label": "Customer ID", "labels": ["customer id", "cust id", "cif no", "cif"]},
-    {"extra_key": "bank_name", "extra_label": "Bank Name", "labels": ["bank name"]}
+    {
+      "canonical": "name",
+      "labels": [
+        "account holder",
+        "account holder name",
+        "customer name",
+        "name",
+        "name of customer"
+      ]
+    },
+    {
+      "canonical": "address",
+      "labels": [
+        "address",
+        "customer address",
+        "mailing address"
+      ]
+    },
+    {
+      "canonical": "city",
+      "labels": [
+        "city"
+      ]
+    },
+    {
+      "canonical": "pincode",
+      "labels": [
+        "pin code",
+        "pincode"
+      ],
+      "document_wide": true
+    },
+    {
+      "canonical": "mobile",
+      "labels": [
+        "mobile",
+        "registered mobile",
+        "phone"
+      ],
+      "document_wide": true
+    },
+    {
+      "canonical": "email",
+      "labels": [
+        "e-mail",
+        "email"
+      ],
+      "document_wide": true
+    },
+    {
+      "canonical": "pan",
+      "labels": [
+        "pan"
+      ],
+      "document_wide": true
+    },
+    {
+      "extra_key": "account_number",
+      "extra_label": "Account Number",
+      "labels": [
+        "a/c no",
+        "account no",
+        "account number",
+        "savings bank account"
+      ],
+      "value_kind": "account_no"
+    },
+    {
+      "extra_key": "ifsc",
+      "extra_label": "IFSC Code",
+      "labels": [
+        "ifs code",
+        "ifsc",
+        "ifsc code"
+      ],
+      "value_kind": "ifsc",
+      "document_wide": true
+    },
+    {
+      "extra_key": "branch",
+      "extra_label": "Branch",
+      "labels": [
+        "branch",
+        "branch code",
+        "branch name"
+      ]
+    },
+    {
+      "extra_key": "customer_id",
+      "extra_label": "Customer ID",
+      "labels": [
+        "cif",
+        "cif no",
+        "cif number",
+        "cust id",
+        "customer id",
+        "customer information file"
+      ]
+    },
+    {
+      "extra_key": "bank_name",
+      "extra_label": "Bank Name",
+      "labels": [
+        "bank name"
+      ]
+    }
   ]
 }

@@ -48,9 +48,19 @@ class KnowledgeQueryRequest(BaseModel):
 
     question: str = Field(
         ...,
-        min_length=3,
+        # 1, not 3: "Hi" is two characters and was rejected with a 422 before
+        # it could ever reach intent routing.
+        min_length=1,
         max_length=500,
         description="The user's question about KYC rules, forms, or process.",
+    )
+    session_id: str | None = Field(
+        None,
+        description=(
+            "The active KYC session, when there is one. Supplied so questions "
+            "about the user's OWN progress are answered from that session's "
+            "authoritative state instead of from the document corpus."
+        ),
     )
     top_k: int | None = Field(
         None,

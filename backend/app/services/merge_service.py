@@ -162,7 +162,16 @@ class MergeService:
                     continue
             # Unparseable date: fall through to text normalization.
         # Text-ish kinds (and choice values): case/spacing/punctuation-blind.
-        key = re.sub(r"[.,'\-]", " ", raw.casefold())
+        #
+        # Punctuation is split into two classes, because collapsing both to a
+        # space manufactured conflicts. A full stop or apostrophe sits INSIDE a
+        # word — "M.G. Road" and "MG Road" are the same address, "O'Brien" and
+        # "OBrien" the same name — so those are deleted. A comma, hyphen or
+        # slash SEPARATES words — "Prasad-Nathe" is "Prasad Nathe" — so those
+        # become spaces. Treating "M.G." as "m g" made it differ from "mg" and
+        # raised a conflict over one address written two ways.
+        key = re.sub(r"[.']", "", raw.casefold())
+        key = re.sub(r"[,\-/]", " ", key)
         return re.sub(r"\s+", " ", key).strip()
 
 

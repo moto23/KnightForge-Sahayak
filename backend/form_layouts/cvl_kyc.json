@@ -1,0 +1,278 @@
+{
+  "form_id": "cvl_kyc",
+  "label": "CVL KYC Form (CDSL)",
+  "has_text_layer": true,
+  "excluded_widget_patterns": [
+    "branch",
+    "employee",
+    "emp_",
+    "official",
+    "acknowle"
+  ],
+  "excluded_regions": [
+    [
+      1,
+      {
+        "x0": 0,
+        "y0": 600,
+        "x1": 595,
+        "y1": 842
+      }
+    ]
+  ],
+  "fields": {
+    "full_name": {
+      "page": 0,
+      "rect": {
+        "x0": 240,
+        "y0": 217,
+        "x1": 455,
+        "y1": 231
+      }
+    },
+    "father_spouse_name": {
+      "page": 0,
+      "rect": {
+        "x0": 240,
+        "y0": 253,
+        "x1": 455,
+        "y1": 267
+      }
+    },
+    "date_of_birth": {
+      "page": 0,
+      "mode": "comb",
+      "cells": 8,
+      "rect": {
+        "x0": 240,
+        "y0": 273,
+        "x1": 340,
+        "y1": 287
+      }
+    },
+    "pan": {
+      "page": 0,
+      "mode": "comb",
+      "cells": 10,
+      "rect": {
+        "x0": 66,
+        "y0": 192,
+        "x1": 200,
+        "y1": 206
+      }
+    },
+    "correspondence_address": {
+      "page": 0,
+      "strip_separators": false,
+      "rect": {
+        "x0": 80,
+        "y0": 605,
+        "x1": 560,
+        "y1": 619
+      }
+    },
+    "city": {
+      "page": 0,
+      "rect": {
+        "x0": 112,
+        "y0": 660,
+        "x1": 265,
+        "y1": 674
+      }
+    },
+    "district": {
+      "page": 0,
+      "rect": {
+        "x0": 312,
+        "y0": 660,
+        "x1": 420,
+        "y1": 674
+      }
+    },
+    "pincode": {
+      "page": 0,
+      "mode": "comb",
+      "cells": 6,
+      "rect": {
+        "x0": 472,
+        "y0": 660,
+        "x1": 558,
+        "y1": 674
+      }
+    },
+    "state": {
+      "page": 0,
+      "rect": {
+        "x0": 70,
+        "y0": 678,
+        "x1": 262,
+        "y1": 692
+      }
+    },
+    "country": {
+      "page": 0,
+      "rect": {
+        "x0": 316,
+        "y0": 678,
+        "x1": 500,
+        "y1": 692
+      }
+    },
+    "email": {
+      "page": 1,
+      "rect": {
+        "x0": 82,
+        "y0": 375,
+        "x1": 555,
+        "y1": 389
+      }
+    },
+    "mobile": {
+      "page": 1,
+      "mode": "comb",
+      "cells": 10,
+      "rect": {
+        "x0": 134,
+        "y0": 396,
+        "x1": 300,
+        "y1": 410
+      }
+    },
+    "declaration_place": {
+      "page": 1,
+      "strip_separators": false,
+      "rect": {
+        "x0": 66.0,
+        "y0": 554.0,
+        "x1": 219.9,
+        "y1": 566.0
+      }
+    },
+    "declaration_date": {
+      "page": 1,
+      "mode": "comb",
+      "cells": 10,
+      "date_format": "DD MM YYYY",
+      "strip_separators": false,
+      "rect": {
+        "x0": 65.4,
+        "y0": 541.0,
+        "x1": 152.6,
+        "y1": 552.5
+      }
+    },
+    "application_type": {
+      "page": 0,
+      "mode": "check",
+      "tick_check_mark": true,
+      "option_rects": {
+        "new": { "x0": 337.4, "y0": 118.4, "x1": 347.2, "y1": 128.6 },
+        "update": { "x0": 412.0, "y0": 118.4, "x1": 421.9, "y1": 128.6 }
+      }
+    },
+    "kyc_mode": {
+      "page": 0,
+      "mode": "check",
+      "tick_check_mark": true,
+      "option_rects": {
+        "normal": { "x0": 41.2, "y0": 152.3, "x1": 49.6, "y1": 160.5 },
+        "ekyc_otp": { "x0": 109.2, "y0": 152.3, "x1": 117.5, "y1": 160.5 },
+        "ekyc_biometric": { "x0": 190.5, "y0": 152.3, "x1": 198.8, "y1": 160.5 },
+        "online_kyc": { "x0": 286.8, "y0": 150.8, "x1": 295.1, "y1": 159.0 },
+        "offline_ekyc": { "x0": 368.9, "y0": 152.1, "x1": 377.2, "y1": 160.3 },
+        "digilocker": { "x0": 459.4, "y0": 152.1, "x1": 467.7, "y1": 160.3 }
+      }
+    },
+    "gender": {
+      "page": 0,
+      "mode": "check",
+      "tick_check_mark": true,
+      "option_rects": {
+        "male": { "x0": 152.4, "y0": 293.3, "x1": 160.7, "y1": 301.5 },
+        "female": { "x0": 244.1, "y0": 293.3, "x1": 252.4, "y1": 301.5 },
+        "transgender": { "x0": 331.4, "y0": 293.7, "x1": 339.7, "y1": 301.9 }
+      }
+    },
+    "marital_status": {
+      "page": 0,
+      "mode": "check",
+      "tick_check_mark": true,
+      "option_rects": {
+        "single": { "x0": 152.4, "y0": 312.0, "x1": 160.7, "y1": 320.2 },
+        "married": { "x0": 244.2, "y0": 312.0, "x1": 252.5, "y1": 320.2 }
+      }
+    },
+    "nationality": {
+      "page": 0,
+      "mode": "check",
+      "tick_check_mark": true,
+      "option_rects": {
+        "indian": { "x0": 152.4, "y0": 328.9, "x1": 160.7, "y1": 337.1 },
+        "other": { "x0": 244.2, "y0": 328.9, "x1": 252.5, "y1": 337.1 }
+      }
+    },
+    "residential_status": {
+      "page": 0,
+      "mode": "check",
+      "tick_check_mark": true,
+      "option_rects": {
+        "resident_individual": { "x0": 152.4, "y0": 349.3, "x1": 160.7, "y1": 357.5 },
+        "non_resident": { "x0": 289.6, "y0": 349.3, "x1": 297.9, "y1": 357.5 },
+        "foreign_national": { "x0": 152.4, "y0": 368.6, "x1": 160.7, "y1": 376.8 },
+        "person_of_indian_origin": { "x0": 289.6, "y0": 368.6, "x1": 297.9, "y1": 376.8 }
+      }
+    },
+    "poa_document": {
+      "page": 1,
+      "mode": "check",
+      "tick_check_mark": true,
+      "option_rects": {
+        "aadhaar": { "x0": 40.4, "y0": 191.1, "x1": 53.7, "y1": 204.3 },
+        "passport": { "x0": 40.4, "y0": 208.8, "x1": 53.7, "y1": 222.0 },
+        "voter_id": { "x0": 40.4, "y0": 225.3, "x1": 53.7, "y1": 238.5 },
+        "driving_licence": { "x0": 40.4, "y0": 243.5, "x1": 53.7, "y1": 256.8 },
+        "nrega_job_card": { "x0": 40.4, "y0": 261.9, "x1": 53.7, "y1": 275.1 },
+        "npr_letter": { "x0": 40.4, "y0": 280.8, "x1": 53.7, "y1": 294.0 },
+        "others": { "x0": 40.4, "y0": 299.0, "x1": 53.7, "y1": 312.2 }
+      }
+    },
+    "poa_document_number": {
+      "page": 1,
+      "strip_separators": false,
+      "rect": { "x0": 170.0, "y0": 316.5, "x1": 316.6, "y1": 329.5 }
+    },
+    "aadhaar": {
+      "page": 0,
+      "mode": "comb",
+      "cells": 12,
+      "rect": {
+        "x0": 262.0,
+        "y0": 636.0,
+        "x1": 410.0,
+        "y1": 650.0
+      }
+    }
+  },
+  "photo": {
+    "page": 0,
+    "rect": {
+      "x0": 458,
+      "y0": 280,
+      "x1": 556,
+      "y1": 372
+    }
+  },
+  "signature": {
+    "page": 1,
+    "rect": {
+      "x0": 432,
+      "y0": 482,
+      "x1": 560,
+      "y1": 520
+    }
+  },
+  "not_on_form": [
+    "occupation",
+    "gross_annual_income"
+  ]
+}

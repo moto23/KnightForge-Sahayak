@@ -28,6 +28,7 @@ from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import RedirectResponse
 
 from app.core.config import settings
+from app.core.rate_limit import auth_limiter, limit
 from app.core.dependencies import get_auth_service, get_current_user
 from app.core.exceptions import DomainError, OAuthFailedError
 from app.infrastructure.db.models import User
@@ -87,6 +88,7 @@ def _auth_response(response: Response, session: AuthSession) -> AuthResponse:
 
 @router.post(
     "/register",
+    dependencies=[Depends(limit(auth_limiter))],
     response_model=AuthResponse,
     status_code=201,
     summary="Create an account and sign in",
@@ -103,6 +105,7 @@ async def register(
 
 @router.post(
     "/login",
+    dependencies=[Depends(limit(auth_limiter))],
     response_model=AuthResponse,
     summary="Sign in with email and password",
     responses={401: {"description": "Incorrect email or password."}},
@@ -123,6 +126,7 @@ async def login(
 
 @router.post(
     "/refresh",
+    dependencies=[Depends(limit(auth_limiter))],
     response_model=AuthResponse,
     summary="Rotate the refresh cookie and mint a new access token",
     description=(
@@ -148,6 +152,7 @@ async def refresh(
 
 @router.post(
     "/logout",
+    dependencies=[Depends(limit(auth_limiter))],
     response_model=LogoutResponse,
     summary="Sign out on this device",
 )
@@ -164,6 +169,7 @@ async def logout(
 
 @router.post(
     "/logout-all",
+    dependencies=[Depends(limit(auth_limiter))],
     response_model=LogoutResponse,
     summary="Sign out on every device",
     responses={401: {"description": "Not signed in."}},

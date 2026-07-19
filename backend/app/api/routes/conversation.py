@@ -11,7 +11,14 @@ import logging
 
 from fastapi import APIRouter, Depends
 
-from app.core.dependencies import get_conversation_service
+from app.core.rate_limit import ai_limiter, limit
+from app.core.dependencies import (
+    get_conversation_service,
+    get_optional_user,
+    get_session_service,
+)
+from app.infrastructure.db.models import User
+from app.services.session_service import SessionService
 from app.schemas.conversation import (
     ExplainRequest,
     ExplainResponse,
@@ -45,6 +52,7 @@ def _extraction_model(extraction: ExtractedAnswer | None) -> ExtractedAnswerMode
 
 @router.post(
     "/start",
+    dependencies=[Depends(limit(ai_limiter))],
     response_model=StartConversationResponse,
     status_code=201,
     summary="Start a conversational interview",
@@ -71,6 +79,7 @@ async def start_conversation(
 
 @router.post(
     "/reply",
+    dependencies=[Depends(limit(ai_limiter))],
     response_model=ReplyResponse,
     summary="Send a user message",
     description=(
@@ -83,8 +92,11 @@ async def start_conversation(
 async def reply(
     request: ReplyRequest,
     conversation: ConversationService = Depends(get_conversation_service),
+    sessions: SessionService = Depends(get_session_service),
+    user: User | None = Depends(get_optional_user),
 ) -> ReplyResponse:
     """Handle one user message end-to-end."""
+    sessions.assert_owner(request.session_id, user.id if user else None)
     result = conversation.reply(request.session_id, request.message, request.language)
     return ReplyResponse(
         session_id=result.session.session_id,
@@ -102,6 +114,7 @@ async def reply(
 
 @router.post(
     "/explain",
+    dependencies=[Depends(limit(ai_limiter))],
     response_model=ExplainResponse,
     summary="Explain a field",
     description=(
@@ -113,8 +126,11 @@ async def reply(
 async def explain(
     request: ExplainRequest,
     conversation: ConversationService = Depends(get_conversation_service),
+    sessions: SessionService = Depends(get_session_service),
+    user: User | None = Depends(get_optional_user),
 ) -> ExplainResponse:
     """Explain one field of the KYC form."""
+    sessions.assert_owner(request.session_id, user.id if user else None)
     explanation = conversation.explain_field(
         request.session_id, request.field_id, request.language
     )
@@ -128,6 +144,7 @@ async def explain(
 
 @router.post(
     "/extract",
+    dependencies=[Depends(limit(ai_limiter))],
     response_model=ExtractResponse,
     summary="Extract a structured answer from natural language",
     description=(
@@ -140,8 +157,11 @@ async def explain(
 async def extract(
     request: ExtractRequest,
     conversation: ConversationService = Depends(get_conversation_service),
+    sessions: SessionService = Depends(get_session_service),
+    user: User | None = Depends(get_optional_user),
 ) -> ExtractResponse:
     """Turn free text into a structured, normalized answer candidate."""
+    sessions.assert_owner(request.session_id, user.id if user else None)
     extraction = conversation.extract_answer(
         request.session_id, request.message, request.field_id, request.language
     )

@@ -1,0 +1,28 @@
+{
+  "id": "ration_card",
+  "label": "Ration Card",
+  "kind": "identity_document",
+  "markers": {
+    "strong": ["ration card", "public distribution system", "food and civil supplies", "fair price shop"],
+    "weak": ["pds", "ration", "card no", "head of family", "family members", "unit", "aay", "phh", "apl", "bpl", "fps", "civil supplies", "food security"],
+    "min_score": 3
+  },
+  "fields": [
+    {"canonical": "name", "labels": ["name of head of family", "head of family", "card holder name", "holder name", "name"]},
+    {"canonical": "father_name", "labels": ["father's name", "fathers name", "husband's name", "guardian name"]},
+    {"canonical": "dob", "labels": ["date of birth", "dob"]},
+    {"canonical": "gender", "labels": ["gender", "sex"], "document_wide": true},
+    {"canonical": "address", "labels": ["address", "residential address"]},
+    {"canonical": "city", "labels": ["city", "town", "village", "district"]},
+    {"canonical": "state", "labels": ["state"]},
+    {"canonical": "pincode", "labels": ["pin code", "pincode", "pin"], "document_wide": true},
+    {"canonical": "mobile", "labels": ["mobile", "mobile no"], "document_wide": true},
+    {"canonical": "aadhaar", "labels": ["aadhaar", "uid"], "document_wide": true},
+    {"extra_key": "ration_card_number", "extra_label": "Ration Card Number", "labels": ["ration card no", "ration card number", "card no", "card number"]},
+    {"extra_key": "card_type", "extra_label": "Card Type", "labels": ["card type", "category", "scheme"]},
+    {"extra_key": "family_members", "extra_label": "Family Members", "labels": ["no. of family members", "family members", "total members", "units"], "value_kind": "count"},
+    {"extra_key": "fps_name", "extra_label": "Fair Price Shop", "labels": ["fair price shop", "fps name", "shop name"]},
+    {"extra_key": "issuing_authority", "extra_label": "Issuing Authority", "labels": ["issuing authority", "issued by"]},
+    {"extra_key": "district", "extra_label": "District", "labels": ["district", "taluka", "tehsil"]}
+  ]
+}

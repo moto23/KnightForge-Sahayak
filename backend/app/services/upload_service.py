@@ -106,8 +106,16 @@ class UploadService:
     # Commands
     # ------------------------------------------------------------------ #
 
-    async def store_upload(self, upload: UploadFile) -> UploadedDocument:
-        """Validate an incoming file end-to-end, persist it, and return its record."""
+    async def store_upload(
+        self, upload: UploadFile, owner_id: str | None = None
+    ) -> UploadedDocument:
+        """
+        Validate an incoming file end-to-end, persist it, and return its record.
+
+        `owner_id` is the signed-in uploader, or None for a guest — see
+        UploadedDocument.owner_id. Defaulted so every existing caller
+        (and the regression suites) keeps working unchanged.
+        """
         original_filename = _sanitize_original_filename(upload.filename or "")
         if not original_filename:
             raise EmptyUploadError("No file was provided (missing filename).")
@@ -126,6 +134,7 @@ class UploadService:
         self._storage.save(category, stored_filename, content)
         document = UploadedDocument(
             document_id=document_id,
+            owner_id=owner_id,
             original_filename=original_filename,
             stored_filename=stored_filename,
             content_type=canonical_mime,

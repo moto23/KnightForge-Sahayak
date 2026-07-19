@@ -12,6 +12,7 @@ import logging
 from fastapi import APIRouter, Depends
 
 from app.core.dependencies import (
+    owned_session,
     get_conversation_service,
     get_interview_service,
     get_session_service,
@@ -60,7 +61,7 @@ async def create_session(
     responses={404: {"description": "Session not found."}},
 )
 async def get_session(
-    session_id: str,
+    session_id: str = Depends(owned_session),
     sessions: SessionService = Depends(get_session_service),
 ) -> SessionResponse:
     """Return the full current state of a session."""
@@ -74,7 +75,7 @@ async def get_session(
     responses={404: {"description": "Session not found."}},
 )
 async def delete_session(
-    session_id: str,
+    session_id: str = Depends(owned_session),
     sessions: SessionService = Depends(get_session_service),
     conversation: ConversationService = Depends(get_conversation_service),
 ) -> DeleteSessionResponse:
@@ -96,8 +97,8 @@ async def delete_session(
     responses={404: {"description": "Session or field not found."}},
 )
 async def submit_answer(
-    session_id: str,
     request: SubmitAnswerRequest,
+    session_id: str = Depends(owned_session),
     interview: InterviewService = Depends(get_interview_service),
 ) -> SubmitAnswerResponse:
     """Answer one field; validation + progress + next question in one call."""
@@ -125,12 +126,43 @@ async def submit_answer(
     responses={404: {"description": "Session or field not found."}},
 )
 async def clear_answer(
-    session_id: str,
     field_id: str,
+    session_id: str = Depends(owned_session),
     sessions: SessionService = Depends(get_session_service),
 ) -> ClearAnswerResponse:
     """Un-answer one field; all derived state is recomputed by the service."""
     session = sessions.clear_answer(session_id, field_id)
+    return ClearAnswerResponse(
+        field_id=field_id,
+        cleared=True,
+        session=SessionResponse.from_session(session),
+    )
+
+
+@router.post(
+    "/{session_id}/skip/{field_id}",
+    response_model=ClearAnswerResponse,
+    summary="Skip one optional question",
+    description=(
+        "Marks a field as declined and advances to the next pending question. "
+        "No value is stored — 'skip' is not an answer — so nothing false "
+        "reaches the profile or the printed form. Only fields the registry "
+        "marks optional may be skipped; a field the active form genuinely "
+        "requires is refused (400 field_not_skippable). The field stays "
+        "editable: answering it later clears the skip."
+    ),
+    responses={
+        400: {"description": "This field is required and cannot be skipped."},
+        404: {"description": "Session or field not found."},
+    },
+)
+async def skip_question(
+    field_id: str,
+    session_id: str = Depends(owned_session),
+    sessions: SessionService = Depends(get_session_service),
+) -> ClearAnswerResponse:
+    """Skip one optional field; derived state is recomputed by the service."""
+    session = sessions.skip_field(session_id, field_id)
     return ClearAnswerResponse(
         field_id=field_id,
         cleared=True,
@@ -146,7 +178,7 @@ async def clear_answer(
     responses={404: {"description": "Session not found."}},
 )
 async def next_question(
-    session_id: str,
+    session_id: str = Depends(owned_session),
     interview: InterviewService = Depends(get_interview_service),
 ) -> NextQuestionResponse:
     """Return metadata for the next field the user should answer."""
@@ -167,7 +199,7 @@ async def next_question(
     responses={404: {"description": "Session not found."}},
 )
 async def get_progress(
-    session_id: str,
+    session_id: str = Depends(owned_session),
     interview: InterviewService = Depends(get_interview_service),
 ) -> ProgressResponse:
     """Progress %, completed/pending/remaining-required fields — all computed."""

@@ -35,6 +35,14 @@ class IntelligenceProcessRequest(BaseModel):
 
     document_id: str = Field(..., description="Id of a previously uploaded document.")
     session_id: str = Field(..., description="Interview session receiving the profile.")
+    is_primary: bool = Field(
+        default=False,
+        description=(
+            "True when this upload IS the primary form to be completed and "
+            "returned. The completed PDF is then produced by filling this "
+            "exact file. At most one per session — a later one replaces it."
+        ),
+    )
 
 
 class PrimaryFormRequest(BaseModel):
@@ -315,7 +323,14 @@ class IntelligenceProcessResponse(BaseModel):
 
 
 def _missing_fields(report: IntelligenceReport) -> list[MissingFieldResponse]:
-    """Canonical fields whose interview field is still unanswered — the gap list."""
+    """
+    Canonical fields whose interview field is still unanswered — the gap list.
+
+    `required` reflects the ACTIVE primary form when the session is scoped to
+    one, so this list matches exactly what the interview will ask. Without
+    that, a field the chosen form doesn't want still showed up starred.
+    """
+    scope = report.session.required_field_ids
     missing: list[MissingFieldResponse] = []
     for canonical in canonical_registry.all_fields():
         session_field = canonical_registry.session_field(canonical.id)
@@ -328,9 +343,13 @@ def _missing_fields(report: IntelligenceReport) -> list[MissingFieldResponse]:
                 canonical_id=canonical.id,
                 label=canonical.label,
                 session_field_id=session_field.id,
-                required=session_field.required,
+                required=(
+                    session_field.id in scope if scope else session_field.required
+                ),
             )
         )
+    # Required gaps first — that is the order the interview will ask them in.
+    missing.sort(key=lambda m: not m.required)
     return missing
 
 

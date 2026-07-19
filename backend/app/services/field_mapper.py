@@ -64,6 +64,10 @@ _VALUE_PATTERNS: dict[str, re.Pattern[str]] = {
     "ifsc": re.compile(r"\b([A-Z]{4}0[A-Z0-9]{6})\b"),
     "account_no": re.compile(r"\b(\d{9,18})\b"),
     "mrz": re.compile(r"(P<[A-Z0-9<]{20,})"),
+    # Small counts (age, family members, units) — the `number` pattern above
+    # deliberately needs 3+ digits so it doesn't grab stray digits from money
+    # fields, which makes it blind to a legitimate "4".
+    "count": re.compile(r"\b(\d{1,4})\b"),
 }
 
 # Free-text values containing these words are printed form instructions,

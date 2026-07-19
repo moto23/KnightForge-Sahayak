@@ -48,9 +48,9 @@ export function Hero() {
             variants={fadeUp}
             className="mx-auto mt-5 max-w-xl text-pretty text-base text-muted-foreground sm:text-lg lg:mx-0"
           >
-            Upload the document you already have. Sahayak reads it, prefills
-            everything it can, interviews you for the rest, validates every
-            field — and hands you a perfectly filled PDF.
+            Upload your KYC form and the documents you already have. Sahayak
+            detects each one, prefills what it can verify, asks you only about
+            the gaps — and returns a completed copy of your own form.
           </motion.p>
 
           <motion.div
@@ -71,7 +71,11 @@ export function Hero() {
             variants={fadeUp}
             className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground lg:justify-start"
           >
-            {["Runs locally", "Deterministic validation", "No form knowledge needed"].map(
+            {[
+              "CVL, SBI, HDFC, ICICI & Axis",
+              "Deterministic validation",
+              "No form knowledge needed",
+            ].map(
               (point) => (
                 <li key={point} className="flex items-center gap-1.5">
                   <CheckCircle2 className="size-4 text-success" aria-hidden />
@@ -98,28 +102,30 @@ export function Hero() {
                 <span className="size-2.5 rounded-full bg-success/70" />
               </div>
               <Badge variant="accent">
-                <Sparkles aria-hidden /> AI Interview
+                <Sparkles aria-hidden /> AI-Guided Completion
               </Badge>
             </div>
 
             <div className="space-y-3">
               <ChatBubble role="assistant">
-                I read your Aadhaar scan and prefilled 15 of 21 fields. What is
-                your gross annual income range?
+                I read your PAN and Aadhaar and filled in what they confirm.
+                What is your gross annual income range?
               </ChatBubble>
               <ChatBubble role="user">Between 10 and 25 lakhs.</ChatBubble>
               <ChatBubble role="assistant">
-                Got it — <strong>₹10–25 Lac</strong> ✓ validated. Only 2
-                questions left!
+                Got it — <strong>₹10–25 Lac</strong> ✓ validated. Just a couple
+                of questions left.
               </ChatBubble>
             </div>
 
             <div className="mt-5 rounded-xl border border-border bg-card/70 p-3.5">
               <div className="mb-2 flex items-center justify-between text-xs">
-                <span className="font-medium">CVL Individual KYC</span>
-                <span className="text-muted-foreground">19 / 21 fields</span>
+                {/* Illustrative preview — the real workspace shows the form
+                    you chose and its own required-field count. */}
+                <span className="font-medium">Your KYC form</span>
+                <span className="text-muted-foreground">Almost complete</span>
               </div>
-              <Progress value={90} aria-label="Demo form 90% complete" />
+              <Progress value={90} aria-label="Illustration: form 90% complete" />
             </div>
           </GlassCard>
 

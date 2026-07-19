@@ -17,6 +17,7 @@ import logging
 
 from fastapi import APIRouter, Depends
 
+from app.core.rate_limit import ai_limiter, limit
 from app.core.dependencies import (
     get_document_understanding_service,
     get_upload_history_service,
@@ -48,6 +49,7 @@ def _mark_ocr_history(
 
 @router.post(
     "",
+    dependencies=[Depends(limit(ai_limiter))],
     response_model=OCRRunResponse,
     summary="Analyze and OCR an uploaded document",
     description=(
@@ -78,6 +80,7 @@ async def run_ocr(
 
 @router.post(
     "/extract",
+    dependencies=[Depends(limit(ai_limiter))],
     response_model=OCRExtractResponse,
     summary="Extract structured KYC fields from a document",
     description=(
@@ -109,6 +112,7 @@ async def extract_fields(
 
 @router.post(
     "/prefill",
+    dependencies=[Depends(limit(ai_limiter))],
     response_model=PrefillResponse,
     summary="Prefill an interview session from a document",
     description=(

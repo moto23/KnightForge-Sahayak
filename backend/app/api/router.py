@@ -9,6 +9,7 @@ phases — main.py never needs to change per-feature.
 from fastapi import APIRouter
 
 from app.api.routes import (
+    assets,
     auth,
     chats,
     conversation,
@@ -34,5 +35,6 @@ api_router.include_router(ocr.router)
 api_router.include_router(pdf.router)
 api_router.include_router(knowledge.router)
 api_router.include_router(intelligence.router)
+api_router.include_router(assets.router)
 api_router.include_router(auth.router)
 api_router.include_router(chats.router)

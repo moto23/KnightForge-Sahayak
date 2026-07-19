@@ -13,6 +13,6 @@ export const healthService = {
 };
 
 export const formsService = {
-  /** GET /schema — the full CVL KYC form definition (cached in context). */
+  /** GET /schema — the interview form definition (cached in context). */
   getSchema: () => api.get<FormSchemaResponse>("/schema"),
 };
