@@ -50,6 +50,10 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 _STATE_COOKIE = "kf_oauth_state"
 
+# Resolved once: every auth cookie must use the SAME policy, and a mismatch
+# between the set and delete calls silently leaves cookies behind.
+_SAMESITE = settings.AUTH_COOKIE_SAMESITE.strip().lower()
+
 
 # --------------------------------------------------------------------------- #
 # Cookie plumbing — the only place the refresh cookie is written or cleared.
@@ -62,14 +66,21 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
         value=token,
         httponly=True,                        # invisible to JavaScript
         secure=settings.AUTH_COOKIE_SECURE,   # true under HTTPS
-        samesite="lax",
+        # Cross-site when the frontend and API are on different domains, as in
+        # production; a "lax" cookie would never be sent from the browser.
+        samesite=_SAMESITE,
         max_age=settings.REFRESH_TOKEN_DAYS * 86_400,
         path="/auth",                         # only ever sent to /auth/*
     )
 
 
 def _clear_refresh_cookie(response: Response) -> None:
-    response.delete_cookie(settings.AUTH_COOKIE_NAME, path="/auth")
+    # Attributes must match those used to SET it, or the browser ignores the
+    # deletion and keeps the original cookie.
+    response.delete_cookie(
+        settings.AUTH_COOKIE_NAME, path="/auth",
+        samesite=_SAMESITE, secure=settings.AUTH_COOKIE_SECURE,
+    )
 
 
 def _auth_response(response: Response, session: AuthSession) -> AuthResponse:
@@ -245,7 +256,12 @@ async def google_login(response: Response) -> GoogleLoginResponse:
         value=state,
         httponly=True,
         secure=settings.AUTH_COOKIE_SECURE,
-        samesite="lax",
+        # MUST match the refresh cookie's policy: this one is SET by a
+        # cross-site fetch from the frontend and READ on the top-level
+        # navigation Google makes to the callback. With "lax" the browser
+        # discards it at the first step and the callback's CSRF check then
+        # fails every time, reported to the user as "sign-in expired".
+        samesite=_SAMESITE,
         max_age=600,
         path="/auth",
     )
@@ -276,6 +292,9 @@ async def google_callback(
         logger.warning("Google callback failed: %s", exc)
         return RedirectResponse(f"{frontend}/signin?error=google_failed")
     redirect = RedirectResponse(f"{frontend}/dashboard?signin=google")
-    redirect.delete_cookie(_STATE_COOKIE, path="/auth")
+    redirect.delete_cookie(
+        _STATE_COOKIE, path="/auth",
+        samesite=_SAMESITE, secure=settings.AUTH_COOKIE_SECURE,
+    )
     _set_refresh_cookie(redirect, session.refresh_token)
     return redirect

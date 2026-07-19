@@ -216,6 +216,22 @@ class Settings(BaseSettings):
     AUTH_COOKIE_NAME: str = "kf_refresh"
     # Set true when serving over HTTPS so the refresh cookie is Secure.
     AUTH_COOKIE_SECURE: bool = False
+    # SameSite policy for the auth cookies: "lax" | "none" | "strict".
+    #
+    # "lax" is right when the frontend and API share a site. This deployment
+    # does NOT: the browser runs on *.vercel.app and calls *.onrender.com, which
+    # are different registrable domains, so every API call is cross-site.
+    #
+    # A SameSite=Lax cookie set in the response to a cross-site fetch is
+    # silently DISCARDED by the browser. That broke Google sign-in — the OAuth
+    # state cookie never got stored, so the callback always failed its CSRF
+    # check and reported "sign-in expired" — and it equally stopped the refresh
+    # cookie from being sent, so sessions could not survive a page reload.
+    #
+    # "none" requires Secure (browsers reject SameSite=None over plain HTTP).
+    # It does NOT weaken CSRF defence here: OAuth still verifies the `state`
+    # parameter against the cookie, and the cookies remain HttpOnly.
+    AUTH_COOKIE_SAMESITE: str = "lax"
     # --- Google OAuth (empty = the Google button is hidden/disabled) ---
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
@@ -280,6 +296,14 @@ class Settings(BaseSettings):
         # Durability. Production runs on an ephemeral filesystem, so these two
         # defaults do not fail loudly — they lose applicant data quietly at the
         # next redeploy, with the database still referencing the missing files.
+        # Browsers reject SameSite=None unless the cookie is also Secure, and
+        # they do it silently: the cookie is simply never stored, which surfaces
+        # much later as an unexplained failed login rather than an error.
+        if self.AUTH_COOKIE_SAMESITE.strip().lower() == "none" and not self.AUTH_COOKIE_SECURE:
+            problems.append(
+                "AUTH_COOKIE_SAMESITE='none' requires AUTH_COOKIE_SECURE=true; "
+                "browsers discard a SameSite=None cookie that is not Secure."
+            )
         if self.DATABASE_URL.startswith("sqlite"):
             problems.append(
                 "DATABASE_URL must point at managed PostgreSQL in production; "
