@@ -32,6 +32,7 @@
 import * as React from "react";
 
 import { ApiError, toApiError } from "@/services/api-client";
+import { useAuth } from "@/contexts/auth-context";
 import { formsService, sessionService } from "@/services";
 import type {
   KYCField,
@@ -140,6 +141,8 @@ export function KycSessionProvider({
     {},
   );
   const [restoring, setRestoring] = React.useState(true);
+  /* Auth must resolve before session requests go out — see the boot effect. */
+  const { restoring: authRestoring } = useAuth();
   const [error, setError] = React.useState<ApiError | null>(null);
 
   // Refs mirror the two values async handlers must never read stale
@@ -173,8 +176,27 @@ export function KycSessionProvider({
     setProgress(progressData);
   }, []);
 
-  /* Restore persisted session + fetch schema on first mount. */
+  /*
+   * Restore persisted session + fetch schema — but ONLY once auth has
+   * reached a resolved state (signed in or definitively a guest).
+   *
+   * Why the gate: a session owned by a signed-in user is, by design, a 404
+   * to an anonymous caller (SessionService.assert_owner refuses with the
+   * same error an unknown id produces, so probing leaks nothing). This
+   * effect used to race auth restoration, so on every refresh
+   * GET /session/{id} went out BEFORE setAccessToken() had run — no
+   * Authorization header, therefore a 404, therefore the branch below
+   * deleted kf.session_id as "stale". The workflow pointer was destroyed on
+   * each F5 and every page then correctly concluded there was no workflow:
+   * empty document list, empty progress, and a brand-new session created by
+   * the interview.
+   *
+   * Waiting for `authRestoring` to clear means the request carries the token
+   * when there is one, so a 404 here is now trustworthy — it really is a
+   * stale or foreign id, which is the only case that should clear storage.
+   */
   React.useEffect(() => {
+    if (authRestoring) return;
     let cancelled = false;
 
     (async () => {
@@ -224,7 +246,7 @@ export function KycSessionProvider({
     return () => {
       cancelled = true;
     };
-  }, [loadSession, storeSessionId, storePrefillMap]);
+  }, [authRestoring, loadSession, storeSessionId, storePrefillMap]);
 
   const ensureSession = React.useCallback(async (): Promise<string> => {
     if (sessionIdRef.current) return sessionIdRef.current;
