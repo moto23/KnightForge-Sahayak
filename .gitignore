@@ -63,3 +63,6 @@ Thumbs.db
 # --- Temporary ---
 *.tmp
 *.temp
+
+# --- Live smoke-test state (holds real session/document ids) ---
+backend/smoke_state.json
