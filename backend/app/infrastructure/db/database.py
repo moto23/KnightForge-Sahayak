@@ -26,18 +26,29 @@ class Base(DeclarativeBase):
     """Declarative base every ORM model inherits from."""
 
 
+_IS_SQLITE = settings.DATABASE_URL.startswith("sqlite")
+
+# Managed Postgres (Neon) suspends idle compute and drops pooled connections,
+# so a socket that was fine a minute ago can be dead on next use. pool_pre_ping
+# validates each checkout and transparently reconnects; without it the first
+# request after an idle period fails with a stale-connection error. Recycling
+# below typical idle timeouts keeps the pool from holding doomed sockets.
+_POSTGRES_POOL = {
+    "pool_pre_ping": True,
+    "pool_recycle": 280,
+    "pool_size": 5,
+    "max_overflow": 5,
+}
+
 engine = create_engine(
     settings.DATABASE_URL,
     # FastAPI serves requests from a threadpool; SQLite connections must be
     # allowed to hop threads (SQLAlchemy's pool still serializes access).
-    connect_args=(
-        {"check_same_thread": False}
-        if settings.DATABASE_URL.startswith("sqlite")
-        else {}
-    ),
+    connect_args={"check_same_thread": False} if _IS_SQLITE else {},
+    **({} if _IS_SQLITE else _POSTGRES_POOL),
 )
 
-if settings.DATABASE_URL.startswith("sqlite"):
+if _IS_SQLITE:
 
     @event.listens_for(engine, "connect")
     def _sqlite_pragmas(dbapi_connection, _record) -> None:  # pragma: no cover

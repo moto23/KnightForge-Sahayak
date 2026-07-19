@@ -76,6 +76,19 @@ class Settings(BaseSettings):
     # Root directory for stored uploads, relative to the backend working
     # directory (subfolders pdf/ and images/ are created beneath it).
     UPLOAD_DIR: str = "uploads"
+    # Where uploaded documents, photos/signatures and generated PDFs live.
+    #   "local" -> LocalStorageAdapter under UPLOAD_DIR (development)
+    #   "s3"    -> S3StorageAdapter against a PRIVATE S3-compatible bucket
+    #
+    # Free hosting tiers have an ephemeral filesystem, so "local" there means
+    # every redeploy silently orphans every stored document while the database
+    # still points at it. Production must set "s3".
+    STORAGE_BACKEND: str = "local"
+    STORAGE_BUCKET: str = ""
+    STORAGE_ENDPOINT_URL: str = ""
+    STORAGE_ACCESS_KEY_ID: str = ""
+    STORAGE_SECRET_ACCESS_KEY: str = ""
+    STORAGE_REGION: str = "auto"
     # Hard cap on a single uploaded file. Enforced while streaming, so an
     # oversized body is rejected without ever being fully read into memory.
     MAX_UPLOAD_SIZE_MB: int = 10
@@ -264,6 +277,26 @@ class Settings(BaseSettings):
         if any(o.startswith("http://") and "localhost" not in o and "127.0.0.1" not in o
                for o in self.cors_origins_list):
             problems.append("CORS_ORIGINS must use https:// for non-local origins.")
+        # Durability. Production runs on an ephemeral filesystem, so these two
+        # defaults do not fail loudly — they lose applicant data quietly at the
+        # next redeploy, with the database still referencing the missing files.
+        if self.DATABASE_URL.startswith("sqlite"):
+            problems.append(
+                "DATABASE_URL must point at managed PostgreSQL in production; "
+                "SQLite lives on an ephemeral disk and is lost on redeploy."
+            )
+        if self.STORAGE_BACKEND.strip().lower() != "s3":
+            problems.append(
+                "STORAGE_BACKEND must be 's3' in production; local storage is "
+                "lost on redeploy, orphaning every stored document."
+            )
+        elif not (self.STORAGE_BUCKET and self.STORAGE_ENDPOINT_URL
+                  and self.STORAGE_ACCESS_KEY_ID and self.STORAGE_SECRET_ACCESS_KEY):
+            problems.append(
+                "STORAGE_BACKEND='s3' requires STORAGE_BUCKET, "
+                "STORAGE_ENDPOINT_URL, STORAGE_ACCESS_KEY_ID and "
+                "STORAGE_SECRET_ACCESS_KEY."
+            )
 
         if problems:
             raise ValueError(

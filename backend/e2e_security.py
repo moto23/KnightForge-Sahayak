@@ -185,9 +185,13 @@ def main() -> int:
     from app.domain.pdf import GeneratedPdf
     from datetime import datetime, timezone
     pdf_id = uuid.uuid4().hex
-    generated_dir = pathlib.Path(settings.GENERATED_PDF_DIR)
-    generated_dir.mkdir(parents=True, exist_ok=True)
-    (generated_dir / f"{pdf_id}.pdf").write_bytes(pdf_bytes)
+    # Write through the SAME FileStorage port the service uses, not straight to
+    # a directory: generated PDFs live in object storage in production, and a
+    # fixture that hardcodes a local path tests a location the product no
+    # longer writes to.
+    from app.core.dependencies import _file_storage
+    from app.domain.enums import DocumentCategory
+    _file_storage.save(DocumentCategory.PDF, f"{pdf_id}.pdf", pdf_bytes)
     _generated_pdf_repository.add(GeneratedPdf(
         pdf_id=pdf_id,
         stored_filename=f"{pdf_id}.pdf",
@@ -382,6 +386,20 @@ def main() -> int:
         ({"JWT_SECRET": "x" * 44, "DEBUG": False, "CORS_ORIGINS": "*"}, "CORS wildcard"),
         ({"JWT_SECRET": "x" * 44, "DEBUG": False,
           "CORS_ORIGINS": "http://app.example.com"}, "plain-http origin"),
+        # Durability: these do not fail loudly in production, they lose
+        # applicant data quietly at the next redeploy.
+        ({"JWT_SECRET": "x" * 44, "DEBUG": False,
+          "CORS_ORIGINS": "https://sahayak.example.com",
+          "STORAGE_BACKEND": "s3", "STORAGE_BUCKET": "b",
+          "STORAGE_ENDPOINT_URL": "https://e", "STORAGE_ACCESS_KEY_ID": "k",
+          "STORAGE_SECRET_ACCESS_KEY": "s"}, "SQLite database"),
+        ({"JWT_SECRET": "x" * 44, "DEBUG": False,
+          "CORS_ORIGINS": "https://sahayak.example.com",
+          "DATABASE_URL": "postgresql+psycopg://u:p@h/db"}, "local file storage"),
+        ({"JWT_SECRET": "x" * 44, "DEBUG": False,
+          "CORS_ORIGINS": "https://sahayak.example.com",
+          "DATABASE_URL": "postgresql+psycopg://u:p@h/db",
+          "STORAGE_BACKEND": "s3"}, "s3 storage without credentials"),
     ):
         try:
             Settings(ENVIRONMENT="production", _env_file=None, **unsafe)
@@ -390,7 +408,12 @@ def main() -> int:
             check(True, f"production refuses to boot with: {label}")
     try:
         Settings(ENVIRONMENT="production", DEBUG=False, JWT_SECRET="x" * 44,
-                 CORS_ORIGINS="https://sahayak.example.com", _env_file=None)
+                 CORS_ORIGINS="https://sahayak.example.com",
+                 DATABASE_URL="postgresql+psycopg://u:p@h/db",
+                 STORAGE_BACKEND="s3", STORAGE_BUCKET="kyc-files",
+                 STORAGE_ENDPOINT_URL="https://example.storage",
+                 STORAGE_ACCESS_KEY_ID="key", STORAGE_SECRET_ACCESS_KEY="secret",
+                 _env_file=None)
         check(True, "a correctly configured production boots")
     except Exception as exc:
         check(False, f"a correctly configured production boots ({exc})")

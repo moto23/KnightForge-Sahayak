@@ -94,9 +94,11 @@ def build() -> dict:
     from app.core.config import settings
 
     pdf_id = uuid.uuid4().hex
-    out_dir = Path(settings.GENERATED_PDF_DIR)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / f"{pdf_id}.pdf").write_bytes(sbi)
+    # Through the FileStorage port, matching the service: in production these
+    # bytes live in a private bucket, not on the instance disk.
+    from app.core.dependencies import _file_storage
+    from app.domain.enums import DocumentCategory
+    _file_storage.save(DocumentCategory.PDF, f"{pdf_id}.pdf", sbi)
     _generated_pdf_repository.add(GeneratedPdf(
         pdf_id=pdf_id, stored_filename=f"{pdf_id}.pdf",
         generated_by_session=session, template_id="sbi_kyc", template_version="1",

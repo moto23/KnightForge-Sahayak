@@ -48,10 +48,12 @@ from app.infrastructure.repositories.in_memory_profile_repository import (
     InMemoryProfileRepository,
 )
 from app.infrastructure.repositories.sqlite_workflow_repositories import (
+    SqlConversationRepository,
     SqliteDocumentRepository,
     SqliteGeneratedPdfRepository,
     SqliteProfileRepository,
     SqliteSessionRepository,
+    SqlSessionAssetRepository,
 )
 from app.infrastructure.repositories.in_memory_understanding_repository import (
     InMemoryDocumentUnderstandingRepository,
@@ -95,9 +97,24 @@ from app.services.upload_service import UploadService
 # --------------------------------------------------------------------------- #
 # Persistent: a restart must not destroy a KYC workflow (Phase 19).
 _session_repository = SqliteSessionRepository()
-_conversation_repository = InMemoryConversationRepository()
+# Persistent: the interview transcript would otherwise empty on restart.
+_conversation_repository = SqlConversationRepository()
 _document_repository = SqliteDocumentRepository()
-_file_storage = LocalStorageAdapter(root=settings.UPLOAD_DIR)
+# The ONE place a storage backend is chosen. Every consumer (uploads, assets,
+# generated PDFs) talks to the FileStorage port, so production swaps the
+# ephemeral local disk for a private bucket without touching a service.
+if settings.STORAGE_BACKEND.strip().lower() == "s3":
+    from app.infrastructure.storage.s3_storage_adapter import S3StorageAdapter
+
+    _file_storage = S3StorageAdapter(
+        bucket=settings.STORAGE_BUCKET,
+        endpoint_url=settings.STORAGE_ENDPOINT_URL,
+        access_key_id=settings.STORAGE_ACCESS_KEY_ID,
+        secret_access_key=settings.STORAGE_SECRET_ACCESS_KEY,
+        region=settings.STORAGE_REGION,
+    )
+else:
+    _file_storage = LocalStorageAdapter(root=settings.UPLOAD_DIR)
 session_service = SessionService(repository=_session_repository)
 interview_service = InterviewService(sessions=session_service)
 ai_service = AIService()
@@ -192,7 +209,10 @@ semantic_extractor_service = SemanticExtractorService(ai=ai_service)
 # Declared before the intelligence service because activating a form has to
 # ask "is a photo/signature already stored?" — see _adopt_available_assets.
 # A plain store with no dependencies of its own, so the order is free.
-_asset_repository = InMemorySessionAssetRepository()
+# Persistent: asset BYTES already survived via FileStorage, but this record
+# is what tells a session it HAS a photo/signature. In memory it was lost on
+# restart, so a session re-asked for images that were already stored.
+_asset_repository = SqlSessionAssetRepository()
 
 document_intelligence_service = DocumentIntelligenceService(
     uploads=upload_service,
@@ -232,6 +252,10 @@ pdf_generation_service = PDFGenerationService(
     filler=form_placement_engine,
     assets=asset_service,
     layouts=filesystem_layout_source,
+    # Generated PDFs are applicant data: they go through the same FileStorage
+    # port as uploads and assets, so production keeps them in the private
+    # bucket instead of on the ephemeral instance disk.
+    storage=_file_storage,
 )
 
 

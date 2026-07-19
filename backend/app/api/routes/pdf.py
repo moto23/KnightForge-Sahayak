@@ -17,7 +17,7 @@ pdf_template_corrupt / pdf_generation_failed.
 
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from fastapi.responses import FileResponse
 
 from app.core.dependencies import (
@@ -128,7 +128,7 @@ async def get_pdf(
 @router.get(
     "/{pdf_id}/download",
     summary="Download the generated PDF file",
-    response_class=FileResponse,
+    response_class=Response,
     responses={
         200: {"content": {"application/pdf": {}}, "description": "The PDF file."},
         404: {"description": "Generated PDF not found."},
@@ -137,13 +137,24 @@ async def get_pdf(
 async def download_pdf(
     pdf_id: str = Depends(owned_pdf),
     pdfs: PDFGenerationService = Depends(get_pdf_generation_service),
-) -> FileResponse:
-    """Stream the generated PDF as a file download."""
-    path = pdfs.file_path(pdf_id)  # typed 404 if record or file is missing
-    return FileResponse(
-        path,
+) -> Response:
+    """
+    Stream the generated PDF as a file download.
+
+    Reads BYTES rather than a path: in production the file lives in a private
+    object store with no filesystem path. Ownership is still enforced by
+    `owned_pdf` before anything is read, and the bytes are served through this
+    endpoint rather than a public object URL, so the bucket stays private.
+    """
+    content = pdfs.read_bytes(pdf_id)  # typed 404 if record or object is missing
+    return Response(
+        content=content,
         media_type="application/pdf",
-        filename=f"kyc-filled-{pdf_id[:8]}.pdf",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="kyc-filled-{pdf_id[:8]}.pdf"'
+            )
+        },
     )
 
 

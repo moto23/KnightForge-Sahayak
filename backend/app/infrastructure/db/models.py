@@ -212,3 +212,49 @@ class GeneratedPdfRecord(Base):
     session_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
     data_json: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class SessionAssetRecord(Base):
+    """
+    Photograph/signature METADATA for one session. Bytes stay with FileStorage.
+
+    Previously in-memory, which was a latent bug rather than a design choice:
+    the image bytes persisted but the record pointing at them did not, so after
+    a restart a session reported its photo missing while the file sat in
+    storage — re-uploads, a wrong Progress figure and orphaned objects.
+
+    A session holds at most ONE asset per kind, enforced here by the composite
+    primary key so a second upload replaces the first rather than accumulating.
+    """
+
+    __tablename__ = "kyc_session_assets"
+
+    session_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), primary_key=True)
+    data_json: Mapped[str] = mapped_column(Text, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )
+
+
+class ConversationTurnRecord(Base):
+    """
+    One utterance of an interview transcript, ordered by `position`.
+
+    Turns are append-only and must come back in the order they were spoken, so
+    ordering is an explicit column rather than an accident of insertion order.
+    The answers themselves live on the Session; losing these would not corrupt
+    the workflow, but the visible conversation would silently empty on restart.
+    """
+
+    __tablename__ = "kyc_conversation_turns"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    data_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    __table_args__ = (
+        Index("ix_kyc_conversation_turns_session_position", "session_id", "position"),
+    )

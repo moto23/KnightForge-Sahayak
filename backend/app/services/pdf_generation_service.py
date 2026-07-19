@@ -34,9 +34,10 @@ from app.core.exceptions import (
 )
 from app.domain.next_question import NextQuestionEngine, next_question_engine
 from app.domain.canonical_schema import CanonicalSchemaRegistry, canonical_registry
+from app.domain.enums import DocumentCategory
 from app.domain.pdf import GeneratedPdf, fingerprint_answers
 from app.services.form_service import FormService, form_service
-from app.domain.repositories import GeneratedPdfRepository, PDFGenerator
+from app.domain.repositories import FileStorage, GeneratedPdfRepository, PDFGenerator
 from app.services.coordinate_mapper import CoordinateMapper
 from app.services.session_service import SessionService
 
@@ -61,6 +62,7 @@ class PDFGenerationService:
         layouts=None,
         forms: FormService = form_service,
         canonical: CanonicalSchemaRegistry = canonical_registry,
+        storage: FileStorage | None = None,
     ) -> None:
         self._sessions = sessions
         self._mapper = mapper
@@ -79,9 +81,17 @@ class PDFGenerationService:
         self._layouts = layouts
         self._forms = forms
         self._canonical = canonical
+        # The BLANK template ships with the application, so it stays on the
+        # filesystem — it is code, not user data.
         self._template_path = Path(config.PDF_TEMPLATE_PATH)
+        # Generated PDFs are applicant data and go through FileStorage, which
+        # in production is a private bucket. Writing them to the local disk
+        # would lose every filled form on the next redeploy while the history
+        # record still pointed at it.
+        self._storage = storage
         self._output_dir = Path(config.GENERATED_PDF_DIR)
-        self._output_dir.mkdir(parents=True, exist_ok=True)
+        if self._storage is None:
+            self._output_dir.mkdir(parents=True, exist_ok=True)
 
     # ------------------------------------------------------------------ #
     # Generation
@@ -286,12 +296,14 @@ class PDFGenerationService:
         """Write the produced bytes + immutable history record (one path)."""
         pdf_id = str(uuid.uuid4())
         stored_filename = f"{pdf_id}.pdf"
-        target = self._output_dir / stored_filename
         try:
-            # 'xb' = exclusive create: even a uuid collision cannot overwrite.
-            with open(target, "xb") as fh:
-                fh.write(pdf_bytes)
-        except OSError as exc:
+            if self._storage is not None:
+                self._storage.save(DocumentCategory.PDF, stored_filename, pdf_bytes)
+            else:
+                # 'xb' = exclusive create: even a uuid collision cannot overwrite.
+                with open(self._output_dir / stored_filename, "xb") as fh:
+                    fh.write(pdf_bytes)
+        except (OSError, Exception) as exc:  # noqa: B014 - storage errors vary
             raise PdfGenerationError(f"could not write output file: {exc}") from exc
 
         record = GeneratedPdf(
@@ -348,10 +360,32 @@ class PDFGenerationService:
             raise GeneratedPdfNotFoundError(pdf_id)
         return path.resolve()
 
+    def read_bytes(self, pdf_id: str) -> bytes:
+        """
+        The generated PDF's bytes, wherever they are stored.
+
+        Object storage has no filesystem path, so downloads read through this
+        rather than `file_path()`. A record whose object has vanished raises
+        the typed 404 instead of a 500, matching the local behaviour.
+        """
+        record = self.get_record(pdf_id)
+        if self._storage is None:
+            return self.file_path(pdf_id).read_bytes()
+        try:
+            return self._storage.read(DocumentCategory.PDF, record.stored_filename)
+        except FileNotFoundError as exc:
+            logger.error("Generated PDF object missing: %s", record.stored_filename)
+            raise GeneratedPdfNotFoundError(pdf_id) from exc
+
     def delete(self, pdf_id: str) -> GeneratedPdf:
         """Remove a generated PDF's file and metadata; return the record."""
         record = self.get_record(pdf_id)
-        (self._output_dir / record.stored_filename).unlink(missing_ok=True)
+        # Deleting an authorized PDF must remove its bytes too, or the object
+        # outlives the record that governs access to it.
+        if self._storage is not None:
+            self._storage.delete(DocumentCategory.PDF, record.stored_filename)
+        else:
+            (self._output_dir / record.stored_filename).unlink(missing_ok=True)
         self._repository.delete(pdf_id)
         logger.info("Generated PDF deleted: %s", pdf_id)
         return record
