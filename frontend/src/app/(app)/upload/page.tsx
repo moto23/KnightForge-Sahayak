@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/card";
 import { SkeletonRow } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useBackendStatus } from "@/hooks/use-backend-status";
 import { useKycSession } from "@/hooks/use-kyc-session";
 import { toApiError } from "@/services/api-client";
 import { intelligenceService, ocrService, uploadService } from "@/services";
@@ -57,6 +58,7 @@ export default function UploadPage() {
     rollbackPrefill,
     fieldMap,
   } = useKycSession();
+  const backend = useBackendStatus();
 
   const [docs, setDocs] = React.useState<WorkspaceDocument[]>([]);
   const [listState, setListState] = React.useState<"loading" | "ready" | "error">(
@@ -720,8 +722,18 @@ export default function UploadPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
+              {/*
+                A bare skeleton during a cold start reads as "stuck". The
+                skeleton stays (this section alone is waiting — the uploader
+                on the left is fully usable), but it now says why.
+              */}
               {listState === "loading" && (
                 <div className="space-y-4" aria-label="Loading documents">
+                  {backend.isWaking && (
+                    <p className="text-sm text-muted-foreground">
+                      Waking up Sahayak — the free-tier server sleeps when idle.
+                    </p>
+                  )}
                   <SkeletonRow />
                   <SkeletonRow />
                 </div>

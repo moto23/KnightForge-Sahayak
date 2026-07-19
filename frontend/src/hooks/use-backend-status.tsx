@@ -1,8 +1,7 @@
 "use client";
 
 /**
- * Backend readiness — tells the UI when the API is merely ASLEEP rather than
- * broken.
+ * Backend readiness — ONE probe, shared by the whole app.
  *
  * The backend runs on a free tier that suspends the container after a period
  * of inactivity. The first request afterwards is not refused; it is queued
@@ -10,17 +9,27 @@
  * naively that looked like "Backend offline" — alarming, and wrong: nothing
  * is broken and the request is on its way.
  *
+ * Why this is a PROVIDER and not a plain hook: it used to be per-component,
+ * so the shell's banner and the dashboard's status pill each ran their own
+ * probe. They disagreed — the banner said "Waking up Sahayak" while the pill
+ * simultaneously said "Backend offline". A sleeping backend must have exactly
+ * one answer, so the probe runs once at the provider and every consumer reads
+ * that same state. It also means N mounted pages cannot hammer a container
+ * that is still booting.
+ *
  * Design constraints this deliberately respects:
- *  - NO polling while the backend is warm. One probe on mount, then silence.
+ *  - NO polling while the backend is warm. One probe, then silence.
  *  - Only GET /health is ever probed. It is idempotent and dependency-free,
  *    so retrying it can never duplicate a mutation or an upload.
- *  - Retries are BOUNDED. When they run out the caller is told "unreachable"
- *    so it can show a real error instead of an endless spinner.
+ *  - Retries are BOUNDED. When they run out, consumers are told
+ *    "unreachable" so they can show a real error instead of a forever spinner.
+ *  - 5xx counts as WAKING, not offline: a booting container answers 502/503
+ *    through the proxy before it is ready.
  *
  * States:
  *   checking     — first probe in flight, still within the grace period
  *   waking       — taking longer than a warm backend ever would; say so
- *   warm         — healthy; the hook is finished and goes quiet
+ *   warm         — healthy; the probe is finished and goes quiet
  *   unreachable  — bounded retries exhausted; surface a real error
  */
 
@@ -48,11 +57,25 @@ const RETRY_BACKOFF_MS = [2_000, 4_000, 8_000, 12_000, 15_000] as const;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export function useBackendStatus(): {
+export type BackendStatusValue = {
   status: BackendStatus;
+  /** True while the backend is booting — never means "broken". */
+  isWaking: boolean;
+  /** True only once bounded retries have conclusively failed. */
+  isOffline: boolean;
   /** Probe again after "unreachable" (wired to a Retry button). */
   retry: () => void;
-} {
+};
+
+const BackendStatusContext = React.createContext<BackendStatusValue | null>(
+  null,
+);
+
+export function BackendStatusProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [status, setStatus] = React.useState<BackendStatus>("checking");
   const [attemptKey, setAttemptKey] = React.useState(0);
 
@@ -79,6 +102,8 @@ export function useBackendStatus(): {
           return; // healthy — stop probing entirely, no polling loop
         } catch {
           if (cancelled) return;
+          // Every failure here (timeout, network, 502/503 from the proxy in
+          // front of a booting container) is treated as "still waking".
           setStatus("waking");
           const backoff = RETRY_BACKOFF_MS[attempt];
           if (backoff === undefined) break; // ladder exhausted
@@ -96,5 +121,40 @@ export function useBackendStatus(): {
     };
   }, [attemptKey]);
 
-  return { status, retry };
+  const value = React.useMemo<BackendStatusValue>(
+    () => ({
+      status,
+      // "checking" is grouped with waking on purpose: until the probe answers
+      // we do not know the backend is healthy, and the one thing we must
+      // never do is call it offline while it might simply be booting.
+      isWaking: status === "checking" || status === "waking",
+      isOffline: status === "unreachable",
+      retry,
+    }),
+    [status, retry],
+  );
+
+  return (
+    <BackendStatusContext.Provider value={value}>
+      {children}
+    </BackendStatusContext.Provider>
+  );
+}
+
+/**
+ * Read the shared backend status.
+ *
+ * Safe outside the provider (marketing pages do not mount it): it then
+ * reports a warm backend, which keeps those pages behaving exactly as before.
+ */
+export function useBackendStatus(): BackendStatusValue {
+  const context = React.useContext(BackendStatusContext);
+  return (
+    context ?? {
+      status: "warm",
+      isWaking: false,
+      isOffline: false,
+      retry: () => {},
+    }
+  );
 }

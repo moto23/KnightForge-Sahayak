@@ -5,6 +5,7 @@ import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/auth-context";
+import { BackendStatusProvider } from "@/hooks/use-backend-status";
 
 /**
  * Client-side app providers. Dark mode is the DEFAULT; next-themes toggles
@@ -20,10 +21,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
       enableSystem={false}
       disableTransitionOnChange
     >
-      <AuthProvider>
-        <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
-        <Toaster />
-      </AuthProvider>
+      {/*
+        One backend probe for the whole app. Previously the shell banner and
+        the dashboard pill each ran their own, which is how the UI managed to
+        say "Waking up Sahayak" and "Backend offline" at the same time.
+      */}
+      <BackendStatusProvider>
+        <AuthProvider>
+          <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
+          <Toaster />
+        </AuthProvider>
+      </BackendStatusProvider>
     </ThemeProvider>
   );
 }

@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { useAsync } from "@/hooks/use-async";
+import { useBackendStatus } from "@/hooks/use-backend-status";
 import { useKycSession } from "@/hooks/use-kyc-session";
 import { toApiError } from "@/services/api-client";
 import { assetsService, conversationService, sessionService } from "@/services";
@@ -56,6 +57,7 @@ export default function InterviewPage() {
     refresh,
     markUserAnswered,
   } = useKycSession();
+  const backend = useBackendStatus();
 
   const [messages, setMessages] = React.useState<UiMessage[]>([]);
   const [draft, setDraft] = React.useState("");
@@ -329,8 +331,39 @@ ${next.question.display_name}${next.question.help_text ? ` — ${next.question.h
   const pendingIds = progress?.pending_required_fields ?? [];
   const progressPercent = Math.round(progress?.progress_percentage ?? session?.progress_percentage ?? 0);
 
+  /*
+   * One spinner used to cover four different situations, so a cold start was
+   * indistinguishable from a hang. Each state now says what is actually
+   * happening, and a conclusively unreachable backend becomes a real error
+   * with a retry rather than a spinner that never resolves.
+   */
+  if (backend.isOffline && phase !== "ready") {
+    return (
+      <ErrorState
+        title="Sahayak's backend isn't responding"
+        description="The server didn't answer after several attempts. It may still be starting up — try again in a moment."
+        onRetry={() => {
+          backend.retry();
+          void boot();
+        }}
+        className="min-h-[50dvh]"
+      />
+    );
+  }
+
   if (restoring || phase === "booting") {
-    return <LoadingAnimation label="Preparing your interview…" className="min-h-[50dvh]" />;
+    return (
+      <LoadingAnimation
+        label={
+          backend.isWaking
+            ? "Waking up Sahayak — the free-tier server sleeps when idle. This can take up to a minute."
+            : restoring
+              ? "Restoring your session…"
+              : "Preparing your interview…"
+        }
+        className="min-h-[50dvh]"
+      />
+    );
   }
 
   if (phase === "error") {

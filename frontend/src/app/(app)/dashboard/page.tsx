@@ -28,11 +28,12 @@ import {
   GlassCard,
 } from "@/components/ui/card";
 import { useAsync } from "@/hooks/use-async";
+import { useBackendStatus } from "@/hooks/use-backend-status";
 import { useKycSession } from "@/hooks/use-kyc-session";
 import { WORKFLOW_STEPS } from "@/lib/navigation";
 import { fadeUp, staggerContainer } from "@/lib/motion";
 import { absoluteUrl } from "@/services/api-client";
-import { healthService, pdfService, uploadService } from "@/services";
+import { pdfService, uploadService } from "@/services";
 
 /**
  * Dashboard (Phase 9B.1 — fully integrated).
@@ -50,7 +51,12 @@ export default function DashboardPage() {
     resetSession,
   } = useKycSession();
 
-  const health = useAsync((signal) => healthService.check(signal), []);
+  /*
+   * The shared probe, not a second one of our own. This pill and the shell's
+   * banner are two views of ONE fact; when each fetched its own health the
+   * page could show "Waking up Sahayak" and "Backend offline" together.
+   */
+  const backend = useBackendStatus();
   // Phase 13 resume inputs: what exists already (uploads / generated PDFs)?
   const uploads = useAsync(() => uploadService.list(), []);
   const pdfs = useAsync(
@@ -59,10 +65,22 @@ export default function DashboardPage() {
   );
 
   if (restoring) {
-    return <LoadingAnimation label="Loading your workspace…" className="min-h-[50dvh]" />;
+    return (
+      <LoadingAnimation
+        label={
+          backend.isWaking
+            ? "Waking up Sahayak — the free-tier server sleeps when idle. This can take up to a minute."
+            : "Loading your workspace…"
+        }
+        className="min-h-[50dvh]"
+      />
+    );
   }
 
-  const backendOnline = !health.loading && !health.error;
+  // Offline is now a CONCLUSION (bounded retries failed), never a placeholder
+  // for "haven't heard back yet" — which is what made a booting backend look
+  // broken the moment the page opened.
+  const backendOnline = backend.status === "warm";
   const completed = progress?.interview_status === "completed";
 
   /* ------------------------------------------------------------------ *
@@ -207,18 +225,28 @@ export default function DashboardPage() {
                 "hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs sm:flex " +
                 (backendOnline
                   ? "border-success/30 text-success"
-                  : "border-destructive/30 text-destructive")
+                  : backend.isOffline
+                    ? "border-destructive/30 text-destructive"
+                    : "border-border text-muted-foreground")
               }
               role="status"
             >
               <span
                 className={
                   "size-1.5 rounded-full " +
-                  (backendOnline ? "bg-success" : "bg-destructive animate-pulse-glow")
+                  (backendOnline
+                    ? "bg-success"
+                    : backend.isOffline
+                      ? "bg-destructive animate-pulse-glow"
+                      : "bg-muted-foreground animate-pulse")
                 }
                 aria-hidden
               />
-              {health.loading ? "Checking backend…" : backendOnline ? "Backend online" : "Backend offline"}
+              {backendOnline
+                ? "Backend online"
+                : backend.isOffline
+                  ? "Backend offline"
+                  : "Waking up…"}
             </span>
             <Button variant="gradient" asChild>
               {resume.external ? (
