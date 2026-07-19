@@ -21,6 +21,16 @@ backend/_restart_state.json
 **/*.sqlite
 **/*.sqlite3
 
+# ...but the ChromaDB knowledge index is NOT runtime data: it is the prebuilt
+# vector index of the public KYC corpus, and it contains no applicant data.
+# Its store is named chroma.sqlite3, which the rule above silently swallowed —
+# shipping without it left the deployed service with an empty index and every
+# KYC question answering 409 knowledge_index_empty. It must ship prebuilt:
+# rebuilding at boot would re-embed the whole corpus on a 0.1-vCPU instance and
+# peaks around 496 MB, dangerously close to the 512 MB limit.
+!backend/knowledge_db/
+!backend/knowledge_db/**
+
 # --- The frontend is deployed separately to Vercel ------------------------- #
 frontend/
 node_modules/

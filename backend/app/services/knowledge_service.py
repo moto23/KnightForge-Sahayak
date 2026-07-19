@@ -383,7 +383,11 @@ class KnowledgeService:
             ai_available=self._ai.is_available,
             document_count=document_count,
             chunk_count=chunk_count,
-            embedding_model=self._config.KNOWLEDGE_EMBEDDING_MODEL,
+            # The ACTIVE adapter's model, not the configured name. The ONNX
+            # embedder serves a bundled model and ignores the configured
+            # value, so reporting config here told the status endpoint that
+            # bge-small was running when MiniLM actually was.
+            embedding_model=self._embedder.model_name(),
             vector_db_path=self._config.KNOWLEDGE_DB_DIR,
             collection=self._config.KNOWLEDGE_COLLECTION,
             chunk_size=self._config.KNOWLEDGE_CHUNK_SIZE,
