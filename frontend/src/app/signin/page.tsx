@@ -17,6 +17,7 @@ import { GlassCard } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/auth-context";
+import { useBackendStatus } from "@/hooks/use-backend-status";
 import { toApiError } from "@/services/api-client";
 import { authService } from "@/services";
 
@@ -94,8 +95,19 @@ function SignInContent() {
   const searchParams = useSearchParams();
   const { login, register: registerAccount, loginWithGoogle, isAuthenticated } = useAuth();
   const [mode, setMode] = React.useState<"signin" | "register">("signin");
-  const [googleAvailable, setGoogleAvailable] = React.useState(false);
+  /*
+   * Three states, because two produced a lie. `null` = the server has not
+   * answered yet (still checking, or the free-tier backend is waking) and
+   * says NOTHING about configuration; only a successful {"google": false}
+   * may claim "Not configured". Collapsing the unknown state into `false` —
+   * and starting there — meant every visitor saw "NOT CONFIGURED" for at
+   * least one round trip, and a cold start pinned it there permanently.
+   */
+  const [googleAvailable, setGoogleAvailable] = React.useState<boolean | null>(
+    null,
+  );
   const [googleBusy, setGoogleBusy] = React.useState(false);
+  const backend = useBackendStatus();
 
   const {
     register,
@@ -125,15 +137,26 @@ function SignInContent() {
     }
   }, [searchParams]);
 
-  /* Hide the Google button unless the backend has OAuth configured. */
+  /*
+   * Ask the backend whether Google OAuth is configured. A transport failure
+   * (timeout, network, 502/503 from a waking container) leaves the state at
+   * `null` — we could not ask, so we assert nothing. Keyed on the shared
+   * probe's status so the question is re-asked when the backend turns warm:
+   * a visitor who arrived mid-cold-start gets the real answer seconds later
+   * without refreshing.
+   */
   React.useEffect(() => {
+    if (backend.status !== "warm" && backend.status !== "checking") return;
     const controller = new AbortController();
     authService
       .providers(controller.signal)
       .then((p) => setGoogleAvailable(p.google))
-      .catch(() => setGoogleAvailable(false));
+      .catch(() => {
+        /* unanswered — stays/returns to null, never a false "not configured" */
+        setGoogleAvailable(null);
+      });
     return () => controller.abort();
-  }, []);
+  }, [backend.status]);
 
   /* Already signed in? Straight to the workspace. */
   React.useEffect(() => {
@@ -215,7 +238,7 @@ function SignInContent() {
               : "Save conversations and pick up where you left off, on any device."}
           </p>
 
-          {googleAvailable ? (
+          {googleAvailable === true ? (
             <Button
               variant="outline"
               className="mt-6 w-full"
@@ -224,7 +247,16 @@ function SignInContent() {
             >
               <GoogleIcon /> Continue with Google
             </Button>
+          ) : googleAvailable === null ? (
+            /* Unknown ≠ unconfigured: the server hasn't answered (yet). */
+            <Button variant="outline" className="mt-6 w-full" disabled>
+              <GoogleIcon /> Continue with Google
+              <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {backend.isWaking ? "Waking up…" : "Checking…"}
+              </span>
+            </Button>
           ) : (
+            /* The server itself said google:false — the only honest case. */
             <Button variant="outline" className="mt-6 w-full" disabled>
               <GoogleIcon /> Continue with Google
               <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
