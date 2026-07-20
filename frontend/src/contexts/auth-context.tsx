@@ -65,6 +65,17 @@ export type AuthContextValue = {
   restoring: boolean;
   /** Convenience flag: user !== null. */
   isAuthenticated: boolean;
+  /**
+   * True once the server has given a DEFINITIVE verdict on this browser's
+   * identity — signed in, or genuinely a guest (a 4xx refusal of the refresh
+   * cookie). It stays FALSE when the answer never arrived: network failure,
+   * timeout, or a 5xx such as the free tier's `hibernate-wake-error`.
+   *
+   * The distinction matters because "guest" and "we could not ask" look
+   * identical downstream, yet only the first justifies destroying saved work.
+   * Consumers must not treat an unresolved state as proof of anything.
+   */
+  authResolved: boolean;
 
   login: (email: string, password: string) => Promise<UserProfile>;
   register: (
@@ -86,6 +97,8 @@ const AuthContext = React.createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<UserProfile | null>(null);
   const [restoring, setRestoring] = React.useState(true);
+  /* See AuthContextValue.authResolved — false until the server actually answers. */
+  const [authResolved, setAuthResolved] = React.useState(false);
 
   const refreshTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Latest silentRefresh — read by the timer at fire time (breaks the cycle). */
@@ -133,9 +146,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session.user,
         session.expires_in_minutes,
       );
+      setAuthResolved(true);
       return true;
-    } catch {
-      clearSession(); // no valid cookie — a guest, not an error
+    } catch (err) {
+      /*
+       * A 4xx is the server REFUSING the cookie — a definitive "you are a
+       * guest". Anything else (status 0 network/timeout, or 5xx such as the
+       * free tier's hibernate-wake-error) means the question went unanswered,
+       * and callers must not conclude anything from it. Either way the
+       * in-memory session is cleared; only the confidence differs.
+       */
+      const error = toApiError(err);
+      setAuthResolved(error.status >= 400 && error.status < 500);
+      clearSession();
       return false;
     }
   }, [adoptSession, clearSession]);
@@ -171,6 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session.user,
         session.expires_in_minutes,
       );
+      setAuthResolved(true);
       return session.user;
     },
     [adoptSession],
@@ -184,6 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session.user,
         session.expires_in_minutes,
       );
+      setAuthResolved(true);
       return session.user;
     },
     [adoptSession],
@@ -196,11 +221,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       /* revoking a dead session is fine */
     }
     clearSession();
+    setAuthResolved(true); // deliberately signed out — a definitive guest
   }, [clearSession]);
 
   const logoutAll = React.useCallback(async () => {
     const result = await authService.logoutAll();
     clearSession();
+    setAuthResolved(true); // deliberately signed out — a definitive guest
     return result.sessions_revoked;
   }, [clearSession]);
 
@@ -224,6 +251,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       restoring,
       isAuthenticated: user !== null,
+      authResolved,
       login,
       register,
       logout,
@@ -234,6 +262,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [
       user,
       restoring,
+      authResolved,
       login,
       register,
       logout,

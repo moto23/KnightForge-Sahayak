@@ -142,7 +142,13 @@ export function KycSessionProvider({
   );
   const [restoring, setRestoring] = React.useState(true);
   /* Auth must resolve before session requests go out — see the boot effect. */
-  const { restoring: authRestoring } = useAuth();
+  const { restoring: authRestoring, authResolved } = useAuth();
+  /*
+   * Mirrored into a ref so refresh() can consult it without taking it as a
+   * dependency — refresh() is handed to pages and its identity must stay
+   * stable (see the concurrency note in the file header).
+   */
+  const authResolvedRef = React.useRef(false);
   const [error, setError] = React.useState<ApiError | null>(null);
 
   // Refs mirror the two values async handlers must never read stale
@@ -151,6 +157,10 @@ export function KycSessionProvider({
   const prefillMapRef = React.useRef<PrefillProvenance>({});
   /** In-flight session creation, shared by concurrent ensureSession callers. */
   const creatingSessionRef = React.useRef<Promise<string> | null>(null);
+
+  React.useEffect(() => {
+    authResolvedRef.current = authResolved;
+  }, [authResolved]);
 
   const storeSessionId = React.useCallback((id: string | null) => {
     sessionIdRef.current = id;
@@ -232,8 +242,17 @@ export function KycSessionProvider({
           }
         } else {
           const apiError = toApiError(sessionResult.reason);
-          if (apiError.status === 404) {
-            // Backend restarted (in-memory store) — stale id, start fresh.
+          /*
+           * A 404 is only TRUSTWORTHY once auth has given a definitive
+           * verdict. An owned session read without a token answers 404 too,
+           * so when the refresh failed transiently (offline, timeout, or the
+           * free tier's hibernate-wake-error 503) this branch was deleting
+           * the pointer to perfectly good work that still exists in the
+           * database. Unresolved auth means "we could not ask" — keep the id
+           * and surface a retryable error instead.
+           */
+          if (apiError.status === 404 && authResolvedRef.current) {
+            // Genuinely stale or foreign id — start fresh.
             window.localStorage.removeItem(SESSION_KEY);
           } else if (!cancelled) {
             setError(apiError);
@@ -301,7 +320,9 @@ export function KycSessionProvider({
       setError(null);
     } catch (err) {
       const apiError = toApiError(err);
-      if (apiError.status === 404) {
+      // Same rule as the boot restore: only a 404 seen with a definitive auth
+      // verdict may destroy the saved session (see that branch for why).
+      if (apiError.status === 404 && authResolvedRef.current) {
         window.localStorage.removeItem(SESSION_KEY);
         storeSessionId(null);
         setSession(null);
