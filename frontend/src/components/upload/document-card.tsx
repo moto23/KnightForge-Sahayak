@@ -147,17 +147,45 @@ export function DocumentCard({
       return;
     }
     if (!doc.documentId) return;
+    /*
+     * The tab is claimed HERE, synchronously, while the click's user gesture
+     * is still active.
+     *
+     * The file endpoint is ownership-checked, so the bytes have to be fetched
+     * with the auth header and handed over as a blob: URL — but that fetch is
+     * awaited, and a window.open() after an await has lost the gesture and is
+     * silently swallowed by the popup blocker. That is why the button did
+     * nothing for a stored document while still working mid-upload, where the
+     * local object URL is opened synchronously on the branch above.
+     *
+     * Opening about:blank first and pointing it at the blob once it arrives
+     * keeps the gesture, and keeps the ownership check exactly as strict.
+     */
+    const tab = window.open("", "_blank");
+    if (tab) tab.opener = null; // no back-reference to this window
     try {
       const url = await fetchBlobUrl(`/upload/${doc.documentId}/file`);
-      window.open(url, "_blank", "noopener");
+      if (tab) {
+        tab.location.href = url;
+      } else {
+        // Popup blocked outright (not a timing issue) — fall back to a
+        // same-tab download, which needs no popup permission.
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = doc.filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
       // Left alive briefly so the new tab can read it, then reclaimed.
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch {
+      tab?.close();
       toast.error("Couldn't open that document", {
         description: "It may have been removed, or it belongs to another account.",
       });
     }
-  }, [doc.previewUrl, doc.documentId]);
+  }, [doc.previewUrl, doc.documentId, doc.filename]);
   const Icon = isPdf ? FileText : FileImage;
   const extraction = doc.extraction?.extraction ?? null;
   const acceptedCount = extraction?.fields_accepted ?? 0;
@@ -265,7 +293,17 @@ export function DocumentCard({
         <div className="space-y-1.5 px-3.5 pb-3.5">
           <Progress value={doc.uploadPercent} aria-label="Upload progress" />
           <p className="text-xs text-muted-foreground">
-            Uploading… {doc.uploadPercent}%
+            {/*
+              At 100% the BYTES are delivered but the request is still open —
+              the server is storing the file and writing its history row, which
+              on a small free-tier instance is seconds, not milliseconds.
+              Saying "Uploading… 100%" through all of that reads as a stall;
+              the transfer is genuinely finished, so say what is actually
+              happening instead. Purely a label: no phase or request changes.
+            */}
+            {doc.uploadPercent >= 100
+              ? "Saving to secure storage…"
+              : `Uploading… ${doc.uploadPercent}%`}
           </p>
         </div>
       )}
